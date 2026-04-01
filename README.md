@@ -99,11 +99,66 @@ func main() {
 | Monitoring Services | List, StatusCounts |
 | Notification Policies | GetForHost, GetForService |
 
-### Operational Actions (bulk POST)
+### Downtime Management
 
-- **Acknowledge** resources
-- **Schedule downtime**
-- **Force check**
+```go
+// List all active downtimes
+downtimes, _ := client.Downtimes.List(ctx)
+
+// List downtimes for a specific host
+downtimes, _ := client.Downtimes.ListForHost(ctx, hostID)
+
+// Schedule a downtime on a host
+client.Downtimes.CreateForHost(ctx, hostID, &centreon.CreateDowntimeRequest{
+    Comment:   "Scheduled maintenance",
+    StartTime: time.Now(),
+    EndTime:   time.Now().Add(2 * time.Hour),
+    IsFixed:   true,
+})
+
+// Schedule a downtime on a service
+client.Downtimes.CreateForService(ctx, hostID, serviceID, &centreon.CreateDowntimeRequest{
+    Comment:   "Service patch",
+    StartTime: time.Now(),
+    EndTime:   time.Now().Add(30 * time.Minute),
+    IsFixed:   true,
+})
+
+// Cancel a downtime
+client.Downtimes.Cancel(ctx, downtimeID)
+
+// Cancel all downtimes for a host
+client.Downtimes.CancelForHost(ctx, hostID)
+```
+
+### Acknowledgement Management
+
+```go
+// List all acknowledgements
+acks, _ := client.Acknowledgements.List(ctx)
+
+// Acknowledge a host
+client.Acknowledgements.CreateForHost(ctx, hostID, &centreon.CreateAcknowledgementRequest{
+    Comment:  "Investigating",
+    IsSticky: true,
+})
+
+// Acknowledge a service
+client.Acknowledgements.CreateForService(ctx, hostID, serviceID, &centreon.CreateAcknowledgementRequest{
+    Comment:             "Known issue, fix in progress",
+    IsSticky:            true,
+    IsPersistentComment: true,
+})
+
+// Cancel acknowledgement for a host
+client.Acknowledgements.CancelForHost(ctx, hostID)
+```
+
+### Bulk Operational Actions
+
+- **Acknowledge** multiple resources at once
+- **Schedule downtime** on multiple resources
+- **Force check** on multiple resources
 - **Submit** passive check results
 - **Add comments**
 
