@@ -27,6 +27,9 @@ func TestHostService_List(t *testing.T) {
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
 	}
+	if resp.Result[0].MonitoringServer.ID != 1 {
+		t.Errorf("Result[0].MonitoringServer.ID = %d, want 1", resp.Result[0].MonitoringServer.ID)
+	}
 	if resp.Result[0].Name != "host-01" {
 		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "host-01")
 	}
