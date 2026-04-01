@@ -27,6 +27,7 @@ type Client struct {
 	MonitoringServers *MonitoringServerService
 	Commands          *CommandService
 	Hosts             *HostService
+	HostGroups        *HostGroupService
 }
 
 // Option configures a Client.
@@ -54,6 +55,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.MonitoringServers = &MonitoringServerService{client: c}
 	c.Commands = &CommandService{client: c}
 	c.Hosts = &HostService{client: c}
+	c.HostGroups = &HostGroupService{client: c}
 	return c, nil
 }
 
