@@ -5,6 +5,7 @@ import (
 	"iter"
 )
 
+// Command represents a Centreon check command.
 type Command struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`

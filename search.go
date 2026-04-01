@@ -37,9 +37,9 @@ func Eq(field string, value any) Filter {
 	return condition{field: field, operator: "$eq", value: value}
 }
 
-// Neq creates a not-equal filter: field $ne value.
+// Neq creates a not-equal filter: field $neq value.
 func Neq(field string, value any) Filter {
-	return condition{field: field, operator: "$ne", value: value}
+	return condition{field: field, operator: "$neq", value: value}
 }
 
 // Lt creates a less-than filter: field $lt value.

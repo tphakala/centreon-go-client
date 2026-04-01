@@ -31,7 +31,7 @@ func (e *NotFoundError) Error() string {
 // parseError reads an HTTP response and returns an *APIError.
 func parseError(resp *http.Response) error {
 	apiErr := &APIError{HTTPStatus: resp.StatusCode}
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB limit
 	if err != nil || len(body) == 0 {
 		apiErr.Message = http.StatusText(resp.StatusCode)
 		return apiErr

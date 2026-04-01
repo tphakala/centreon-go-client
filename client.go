@@ -128,6 +128,7 @@ func (c *Client) sendRequest(ctx context.Context, method, url string, body any) 
 		return nil, fmt.Errorf("centreon: create request: %w", err)
 	}
 
+	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -151,11 +152,10 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	// Auto-renew on 401
-	if resp.StatusCode == http.StatusUnauthorized {
-		_ = resp.Body.Close()
+	// Auto-renew on 401 if credentials are available
+	if resp.StatusCode == http.StatusUnauthorized && c.username != "" {
+		resp.Body.Close()
 		if loginErr := c.login(ctx); loginErr != nil {
 			return loginErr
 		}
@@ -163,8 +163,8 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
 		return parseError(resp)

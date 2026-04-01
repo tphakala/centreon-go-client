@@ -74,10 +74,13 @@ func (c *Client) login(ctx context.Context) error {
 }
 
 // Logout sends a logout request and clears the stored token.
+// The token is only cleared on a successful logout.
 func (c *Client) Logout(ctx context.Context) error {
-	err := c.get(ctx, "/logout", nil)
+	if err := c.get(ctx, "/logout", nil); err != nil {
+		return err
+	}
 	c.mu.Lock()
 	c.token = ""
 	c.mu.Unlock()
-	return err
+	return nil
 }

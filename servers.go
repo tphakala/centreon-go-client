@@ -6,6 +6,7 @@ import (
 	"iter"
 )
 
+// MonitoringServer represents a Centreon monitoring server (poller).
 type MonitoringServer struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`

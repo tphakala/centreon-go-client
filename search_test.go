@@ -24,7 +24,7 @@ func TestEq(t *testing.T) {
 
 func TestNeq(t *testing.T) {
 	got := mustJSON(t, Neq("name", "host1").Build())
-	want := `{"name":{"$ne":"host1"}}`
+	want := `{"name":{"$neq":"host1"}}`
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
 	}
