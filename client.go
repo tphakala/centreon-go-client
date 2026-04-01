@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,6 +29,7 @@ type Client struct {
 	token    string
 	username string
 	password string
+	logger   *slog.Logger
 
 	MonitoringServers    *MonitoringServerService
 	Commands             *CommandService
@@ -123,6 +125,17 @@ func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) { c.httpClient = hc }
 }
 
+// WithTimeout sets the HTTP client timeout. Defaults to 30 seconds.
+func WithTimeout(d time.Duration) Option {
+	return func(c *Client) { c.httpClient.Timeout = d }
+}
+
+// WithLogger enables structured logging for API requests and errors.
+// If nil, logging is disabled (the default).
+func WithLogger(l *slog.Logger) Option {
+	return func(c *Client) { c.logger = l }
+}
+
 // buildURL constructs the full API URL for the given path.
 func (c *Client) buildURL(path string) string {
 	return fmt.Sprintf("%s/centreon/api/%s%s", c.baseURL, c.apiVersion, path)
@@ -158,7 +171,13 @@ func (c *Client) sendRequest(ctx context.Context, method, reqURL string, body an
 		req.Header.Set("X-AUTH-TOKEN", token)
 	}
 
-	return c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		c.logError(ctx, "request failed", method, reqURL, err)
+		return nil, err
+	}
+	c.logDebug(ctx, "request completed", method, reqURL, resp.StatusCode)
+	return resp, nil
 }
 
 // do is the core request method. It sends a request and decodes the response.
@@ -174,6 +193,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 	// Auto-renew on 401 if credentials are available
 	if resp.StatusCode == http.StatusUnauthorized && c.username != "" {
 		resp.Body.Close() //nolint:errcheck // best-effort cleanup before retry
+		c.logInfo(ctx, "token expired, re-authenticating")
 		if loginErr := c.login(ctx); loginErr != nil {
 			return loginErr
 		}
@@ -185,7 +205,9 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	if resp.StatusCode >= httpStatusError {
-		return parseError(resp)
+		apiErr := parseError(resp)
+		c.logError(ctx, "API error", method, fullURL, apiErr)
+		return apiErr
 	}
 
 	// 204 No Content — nothing to decode
@@ -199,6 +221,26 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 		}
 	}
 	return nil
+}
+
+// Logging helpers — no-ops when logger is nil.
+
+func (c *Client) logDebug(_ context.Context, msg, method, reqURL string, status int) {
+	if c.logger != nil {
+		c.logger.Debug(msg, "method", method, "url", reqURL, "status", status)
+	}
+}
+
+func (c *Client) logInfo(_ context.Context, msg string) {
+	if c.logger != nil {
+		c.logger.Info(msg)
+	}
+}
+
+func (c *Client) logError(_ context.Context, msg, method, reqURL string, err error) {
+	if c.logger != nil {
+		c.logger.Error(msg, "method", method, "url", reqURL, "error", err)
+	}
 }
 
 // Convenience methods.
