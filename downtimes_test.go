@@ -153,17 +153,40 @@ func TestDowntimeService_ListForHost(t *testing.T) {
 	}
 }
 
+func TestDowntimeService_ListForService(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/services/5/downtimes", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, ListResponse[Downtime]{
+			Result: []Downtime{{ID: 1, HostID: 10, ServiceID: new(5), Comment: "svc downtime"}},
+			Meta:   Meta{Page: 1, Limit: 10, Total: 1},
+		})
+	})
+
+	resp, err := c.Downtimes.ListForService(t.Context(), 10, 5)
+	if err != nil {
+		t.Fatalf("ListForService: %v", err)
+	}
+	if len(resp.Result) != 1 {
+		t.Fatalf("len(Result) = %d, want 1", len(resp.Result))
+	}
+	if resp.Result[0].ServiceID == nil || *resp.Result[0].ServiceID != 5 {
+		t.Error("expected ServiceID 5")
+	}
+}
+
 func TestDowntimeService_CreateForHost(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	start := time.Date(2024, 1, 15, 8, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 	var called bool
 
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/downtimes", func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		var req CreateDowntimeRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+			t.Fatalf("decode body: %v", err)
 		}
 		if req.Comment != "Host maintenance" {
 			t.Errorf("Comment = %q, want %q", req.Comment, "Host maintenance")
@@ -174,12 +197,16 @@ func TestDowntimeService_CreateForHost(t *testing.T) {
 		if !req.StartTime.Equal(start) {
 			t.Errorf("StartTime = %v, want %v", req.StartTime, start)
 		}
+		if !req.EndTime.Equal(end) {
+			t.Errorf("EndTime = %v, want %v", req.EndTime, end)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Downtimes.CreateForHost(t.Context(), 10, CreateDowntimeRequest{
+	err := c.Downtimes.CreateForHost(t.Context(), 10, &CreateDowntimeRequest{
 		Comment:   "Host maintenance",
 		StartTime: start,
+		EndTime:   end,
 		IsFixed:   true,
 		Duration:  7200,
 	})
@@ -195,13 +222,14 @@ func TestDowntimeService_CreateForService(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	start := time.Date(2024, 1, 15, 8, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
 	var called bool
 
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/services/5/downtimes", func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		var req CreateDowntimeRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+			t.Fatalf("decode body: %v", err)
 		}
 		if req.Comment != "Service maintenance" {
 			t.Errorf("Comment = %q, want %q", req.Comment, "Service maintenance")
@@ -215,12 +243,16 @@ func TestDowntimeService_CreateForService(t *testing.T) {
 		if !req.StartTime.Equal(start) {
 			t.Errorf("StartTime = %v, want %v", req.StartTime, start)
 		}
+		if !req.EndTime.Equal(end) {
+			t.Errorf("EndTime = %v, want %v", req.EndTime, end)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Downtimes.CreateForService(t.Context(), 10, 5, CreateDowntimeRequest{
+	err := c.Downtimes.CreateForService(t.Context(), 10, 5, &CreateDowntimeRequest{
 		Comment:   "Service maintenance",
 		StartTime: start,
+		EndTime:   end,
 		IsFixed:   false,
 		Duration:  3600,
 	})

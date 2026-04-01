@@ -29,6 +29,7 @@ type Downtime struct {
 type CreateDowntimeRequest struct {
 	Comment      string    `json:"comment"`
 	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
 	IsFixed      bool      `json:"is_fixed"`
 	Duration     int       `json:"duration,omitzero"`
 	WithServices bool      `json:"with_services,omitzero"`
@@ -80,12 +81,12 @@ func (s *DowntimeService) ListForService(ctx context.Context, hostID, serviceID 
 }
 
 // CreateForHost schedules a downtime for the given host.
-func (s *DowntimeService) CreateForHost(ctx context.Context, hostID int, req CreateDowntimeRequest) error {
+func (s *DowntimeService) CreateForHost(ctx context.Context, hostID int, req *CreateDowntimeRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/downtimes", hostID), req, nil)
 }
 
 // CreateForService schedules a downtime for the given service on a host.
-func (s *DowntimeService) CreateForService(ctx context.Context, hostID, serviceID int, req CreateDowntimeRequest) error {
+func (s *DowntimeService) CreateForService(ctx context.Context, hostID, serviceID int, req *CreateDowntimeRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/downtimes", hostID, serviceID), req, nil)
 }
 

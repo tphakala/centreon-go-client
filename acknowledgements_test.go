@@ -135,6 +135,28 @@ func TestAcknowledgementService_ListForHost(t *testing.T) {
 	}
 }
 
+func TestAcknowledgementService_ListForService(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/services/5/acknowledgements", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, ListResponse[Acknowledgement]{
+			Result: []Acknowledgement{{ID: 1, HostID: 10, ServiceID: new(5), Comment: "svc ack"}},
+			Meta:   Meta{Page: 1, Limit: 10, Total: 1},
+		})
+	})
+
+	resp, err := c.Acknowledgements.ListForService(t.Context(), 10, 5)
+	if err != nil {
+		t.Fatalf("ListForService: %v", err)
+	}
+	if len(resp.Result) != 1 {
+		t.Fatalf("len(Result) = %d, want 1", len(resp.Result))
+	}
+	if resp.Result[0].ServiceID == nil || *resp.Result[0].ServiceID != 5 {
+		t.Error("expected ServiceID 5")
+	}
+}
+
 func TestAcknowledgementService_CreateForHost(t *testing.T) {
 	mux, c := newTestMux(t)
 
