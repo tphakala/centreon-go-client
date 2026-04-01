@@ -29,22 +29,28 @@ type Client struct {
 	username string
 	password string
 
-	MonitoringServers  *MonitoringServerService
-	Commands           *CommandService
-	Hosts              *HostService
-	HostGroups         *HostGroupService
-	HostCategories     *HostCategoryService
-	HostSeverities     *HostSeverityService
-	HostTemplates      *HostTemplateService
-	Services           *ServiceService
-	ServiceGroups      *ServiceGroupService
-	ServiceCategories  *ServiceCategoryService
-	ServiceSeverities  *ServiceSeverityService
-	ServiceTemplates   *ServiceTemplateService
-	Monitoring         *MonitoringResourceService
-	MonitoringHosts    *MonitoringHostService
-	MonitoringServices *MonitoringServiceService
-	Operations         *OperationsService
+	MonitoringServers    *MonitoringServerService
+	Commands             *CommandService
+	Hosts                *HostService
+	HostGroups           *HostGroupService
+	HostCategories       *HostCategoryService
+	HostSeverities       *HostSeverityService
+	HostTemplates        *HostTemplateService
+	Services             *ServiceService
+	ServiceGroups        *ServiceGroupService
+	ServiceCategories    *ServiceCategoryService
+	ServiceSeverities    *ServiceSeverityService
+	ServiceTemplates     *ServiceTemplateService
+	Monitoring           *MonitoringResourceService
+	MonitoringHosts      *MonitoringHostService
+	MonitoringServices   *MonitoringServiceService
+	Operations           *OperationsService
+	Users                *UserService
+	ContactGroups        *ContactGroupService
+	ContactTemplates     *ContactTemplateService
+	UserFilters          *UserFilterService
+	TimePeriods          *TimePeriodService
+	NotificationPolicies *NotificationPolicyService
 }
 
 // Option configures a Client.
@@ -85,6 +91,12 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.MonitoringHosts = &MonitoringHostService{client: c}
 	c.MonitoringServices = &MonitoringServiceService{client: c}
 	c.Operations = &OperationsService{client: c}
+	c.Users = &UserService{client: c}
+	c.ContactGroups = &ContactGroupService{client: c}
+	c.ContactTemplates = &ContactTemplateService{client: c}
+	c.UserFilters = &UserFilterService{client: c}
+	c.TimePeriods = &TimePeriodService{client: c}
+	c.NotificationPolicies = &NotificationPolicyService{client: c}
 	return c, nil
 }
 
