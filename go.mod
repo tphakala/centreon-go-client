@@ -1,4 +1,4 @@
-module github.com/OWNER/centreon-go-client
+module github.com/tphakala/centreon-go-client
 
 go 1.26.0
 
