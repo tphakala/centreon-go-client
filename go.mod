@@ -1,0 +1,3 @@
+module github.com/OWNER/centreon-go-client
+
+go 1.26.0
