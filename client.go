@@ -140,6 +140,14 @@ func WithLogger(l *slog.Logger) Option {
 	return func(c *Client) { c.logger = l }
 }
 
+// Token returns the current authentication token.
+// This can be used to cache the token for external use.
+func (c *Client) Token() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.token
+}
+
 // buildURL constructs the full API URL for the given path.
 func (c *Client) buildURL(path string) string {
 	return fmt.Sprintf("%s/centreon/api/%s%s", c.baseURL, c.apiVersion, path)

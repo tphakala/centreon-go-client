@@ -154,3 +154,13 @@ func TestNewClient_WithHTTPClient(t *testing.T) {
 		t.Error("expected custom HTTP client to be used")
 	}
 }
+
+func TestToken_ReturnsPreConfiguredToken(t *testing.T) {
+	c, err := NewClient("http://example.com", WithAPIToken("my-static-token"))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	if got := c.Token(); got != "my-static-token" {
+		t.Errorf("Token() = %q, want %q", got, "my-static-token")
+	}
+}
