@@ -53,6 +53,7 @@ type Client struct {
 	UserFilters          *UserFilterService
 	TimePeriods          *TimePeriodService
 	NotificationPolicies *NotificationPolicyService
+	Downtimes            *DowntimeService
 }
 
 // Option configures a Client.
@@ -99,6 +100,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.UserFilters = &UserFilterService{client: c}
 	c.TimePeriods = &TimePeriodService{client: c}
 	c.NotificationPolicies = &NotificationPolicyService{client: c}
+	c.Downtimes = &DowntimeService{client: c}
 	return c, nil
 }
 
