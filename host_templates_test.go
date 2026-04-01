@@ -2,6 +2,7 @@ package centreon
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 )
@@ -69,7 +70,7 @@ func TestHostTemplateService_GetByID_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	nfe, ok := err.(*NotFoundError)
+	nfe, ok := errors.AsType[*NotFoundError](err)
 	if !ok {
 		t.Fatalf("expected *NotFoundError, got %T: %v", err, err)
 	}

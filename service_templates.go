@@ -72,7 +72,7 @@ func (s *ServiceTemplateService) Create(ctx context.Context, req CreateServiceTe
 
 // Update updates an existing service template using PATCH.
 func (s *ServiceTemplateService) Update(ctx context.Context, id int, req UpdateServiceTemplateRequest) error {
-	return s.client.patch(ctx, fmt.Sprintf("/configuration/services/templates/%d", id), req, nil)
+	return s.client.patch(ctx, fmt.Sprintf("/configuration/services/templates/%d", id), req)
 }
 
 // Delete deletes a service template by ID.

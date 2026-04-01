@@ -75,7 +75,7 @@ func (s *HostTemplateService) Create(ctx context.Context, req CreateHostTemplate
 
 // Update updates an existing host template using PATCH.
 func (s *HostTemplateService) Update(ctx context.Context, id int, req UpdateHostTemplateRequest) error {
-	return s.client.patch(ctx, fmt.Sprintf("/configuration/hosts/templates/%d", id), req, nil)
+	return s.client.patch(ctx, fmt.Sprintf("/configuration/hosts/templates/%d", id), req)
 }
 
 // Delete deletes a host template by ID.

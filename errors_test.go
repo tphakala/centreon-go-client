@@ -11,7 +11,7 @@ import (
 
 func TestAPIError_Error(t *testing.T) {
 	err := &APIError{
-		HTTPStatus: 403,
+		HTTPStatus: http.StatusForbidden,
 		Code:       42,
 		Message:    "access denied",
 	}
@@ -23,14 +23,14 @@ func TestAPIError_Error(t *testing.T) {
 }
 
 func TestAPIError_ErrorsAs(t *testing.T) {
-	var base error = &APIError{HTTPStatus: 500, Message: "boom"}
+	var base error = &APIError{HTTPStatus: http.StatusInternalServerError, Message: "boom"}
 
-	// errors.As
-	var apiErr *APIError
-	if !errors.As(base, &apiErr) {
-		t.Fatal("errors.As should match *APIError")
+	// errors.AsType (Go 1.26)
+	apiErr, ok := errors.AsType[*APIError](base)
+	if !ok {
+		t.Fatal("errors.AsType should match *APIError")
 	}
-	if apiErr.HTTPStatus != 500 {
+	if apiErr.HTTPStatus != http.StatusInternalServerError {
 		t.Errorf("HTTPStatus = %d, want 500", apiErr.HTTPStatus)
 	}
 
@@ -68,7 +68,7 @@ func TestNotFoundError_ErrorsAs(t *testing.T) {
 func TestParseError_JSONBody(t *testing.T) {
 	body := `{"code":42,"message":"invalid parameter"}`
 	resp := &http.Response{
-		StatusCode: 400,
+		StatusCode: http.StatusBadRequest,
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}
 
@@ -77,7 +77,7 @@ func TestParseError_JSONBody(t *testing.T) {
 	if !ok {
 		t.Fatal("expected *APIError")
 	}
-	if apiErr.HTTPStatus != 400 {
+	if apiErr.HTTPStatus != http.StatusBadRequest {
 		t.Errorf("HTTPStatus = %d, want 400", apiErr.HTTPStatus)
 	}
 	if apiErr.Code != 42 {
@@ -90,7 +90,7 @@ func TestParseError_JSONBody(t *testing.T) {
 
 func TestParseError_EmptyBody(t *testing.T) {
 	resp := &http.Response{
-		StatusCode: 500,
+		StatusCode: http.StatusInternalServerError,
 		Body:       io.NopCloser(strings.NewReader("")),
 	}
 
@@ -99,7 +99,7 @@ func TestParseError_EmptyBody(t *testing.T) {
 	if !ok {
 		t.Fatal("expected *APIError")
 	}
-	if apiErr.HTTPStatus != 500 {
+	if apiErr.HTTPStatus != http.StatusInternalServerError {
 		t.Errorf("HTTPStatus = %d, want 500", apiErr.HTTPStatus)
 	}
 	if apiErr.Message != "Internal Server Error" {
@@ -109,7 +109,7 @@ func TestParseError_EmptyBody(t *testing.T) {
 
 func TestParseError_NonJSONBody(t *testing.T) {
 	resp := &http.Response{
-		StatusCode: 502,
+		StatusCode: http.StatusBadGateway,
 		Body:       io.NopCloser(strings.NewReader("<html>Bad Gateway</html>")),
 	}
 
@@ -118,7 +118,7 @@ func TestParseError_NonJSONBody(t *testing.T) {
 	if !ok {
 		t.Fatal("expected *APIError")
 	}
-	if apiErr.HTTPStatus != 502 {
+	if apiErr.HTTPStatus != http.StatusBadGateway {
 		t.Errorf("HTTPStatus = %d, want 502", apiErr.HTTPStatus)
 	}
 	if apiErr.Message != "<html>Bad Gateway</html>" {
@@ -127,7 +127,7 @@ func TestParseError_NonJSONBody(t *testing.T) {
 }
 
 func TestAPIError_JSONMarshal(t *testing.T) {
-	err := &APIError{HTTPStatus: 400, Code: 1, Message: "bad"}
+	err := &APIError{HTTPStatus: http.StatusBadRequest, Code: 1, Message: "bad"}
 	data, e := json.Marshal(err)
 	if e != nil {
 		t.Fatal(e)

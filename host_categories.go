@@ -65,7 +65,7 @@ func (s *HostCategoryService) Create(ctx context.Context, req CreateHostCategory
 
 // Update replaces an existing host category using PUT.
 func (s *HostCategoryService) Update(ctx context.Context, id int, req UpdateHostCategoryRequest) error {
-	return s.client.put(ctx, fmt.Sprintf("/configuration/hosts/categories/%d", id), req, nil)
+	return s.client.put(ctx, fmt.Sprintf("/configuration/hosts/categories/%d", id), req)
 }
 
 // Delete deletes a host category by ID.

@@ -111,8 +111,8 @@ func all[T any](
 		limit := o.Limit
 
 		for {
-			pageOpts := make([]ListOption, len(opts))
-			copy(pageOpts, opts)
+			pageOpts := make([]ListOption, 0, len(opts)+1)
+			pageOpts = append(pageOpts, opts...)
 			pageOpts = append(pageOpts, WithPage(page))
 
 			resp, err := list(ctx, pageOpts...)

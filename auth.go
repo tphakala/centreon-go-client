@@ -55,9 +55,9 @@ func (c *Client) login(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode >= httpStatusError {
 		return parseError(resp)
 	}
 

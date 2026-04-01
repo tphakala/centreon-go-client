@@ -79,7 +79,7 @@ func (s *HostService) Create(ctx context.Context, req CreateHostRequest) (int, e
 
 // Update updates an existing host using PATCH.
 func (s *HostService) Update(ctx context.Context, id int, req UpdateHostRequest) error {
-	return s.client.patch(ctx, fmt.Sprintf("/configuration/hosts/%d", id), req, nil)
+	return s.client.patch(ctx, fmt.Sprintf("/configuration/hosts/%d", id), req)
 }
 
 // Delete deletes a host by ID.

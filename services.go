@@ -76,7 +76,7 @@ func (s *ServiceService) Create(ctx context.Context, req CreateServiceRequest) (
 
 // Update updates an existing service using PATCH.
 func (s *ServiceService) Update(ctx context.Context, id int, req UpdateServiceRequest) error {
-	return s.client.patch(ctx, fmt.Sprintf("/configuration/services/%d", id), req, nil)
+	return s.client.patch(ctx, fmt.Sprintf("/configuration/services/%d", id), req)
 }
 
 // Delete deletes a service by ID.

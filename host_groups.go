@@ -65,7 +65,7 @@ func (s *HostGroupService) Create(ctx context.Context, req CreateHostGroupReques
 
 // Update replaces an existing host group using PUT.
 func (s *HostGroupService) Update(ctx context.Context, id int, req UpdateHostGroupRequest) error {
-	return s.client.put(ctx, fmt.Sprintf("/configuration/hosts/groups/%d", id), req, nil)
+	return s.client.put(ctx, fmt.Sprintf("/configuration/hosts/groups/%d", id), req)
 }
 
 // Delete deletes a host group by ID.

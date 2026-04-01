@@ -64,7 +64,7 @@ func TestGet_TokenHeader(t *testing.T) {
 		if token != "test-token" {
 			t.Errorf("X-AUTH-TOKEN = %q, want %q", token, "test-token")
 		}
-		writeJSON(w, 200, map[string]string{"status": "ok"})
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
 	var result map[string]string
@@ -85,7 +85,7 @@ func TestPost_ContentType(t *testing.T) {
 		if ct != "application/json" {
 			t.Errorf("Content-Type = %q, want %q", ct, "application/json")
 		}
-		writeJSON(w, 201, map[string]int{"id": 42})
+		writeJSON(w, http.StatusCreated, map[string]int{"id": 42})
 	})
 
 	body := map[string]string{"name": "host1"}
@@ -103,7 +103,7 @@ func TestDelete_204(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("DELETE /centreon/api/latest/hosts/1", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(204)
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	err := c.delete(t.Context(), "/hosts/1")
@@ -116,7 +116,7 @@ func TestErrorResponse_ParsedAsAPIError(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/hosts", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, 403, map[string]any{"code": 42, "message": "forbidden"})
+		writeJSON(w, http.StatusForbidden, map[string]any{"code": 42, "message": "forbidden"})
 	})
 
 	var result any

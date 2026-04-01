@@ -97,7 +97,7 @@ func TestClientList_Integration(t *testing.T) {
 		if page != "1" {
 			t.Errorf("page = %q, want %q", page, "1")
 		}
-		writeJSON(w, 200, map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"result": []item{{ID: 1, Name: "host1"}},
 			"meta":   map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
@@ -132,12 +132,12 @@ func TestAll_TwoPages(t *testing.T) {
 		page := r.URL.Query().Get("page")
 		switch page {
 		case "", "1":
-			writeJSON(w, 200, map[string]any{
+			writeJSON(w, http.StatusOK, map[string]any{
 				"result": []item{{ID: 1}, {ID: 2}},
 				"meta":   map[string]any{"page": 1, "limit": 2, "total": 3},
 			})
 		case "2":
-			writeJSON(w, 200, map[string]any{
+			writeJSON(w, http.StatusOK, map[string]any{
 				"result": []item{{ID: 3}},
 				"meta":   map[string]any{"page": 2, "limit": 2, "total": 3},
 			})
@@ -190,7 +190,7 @@ func TestGetByID_Found(t *testing.T) {
 		if search != expected {
 			t.Errorf("search = %q, want %q", search, expected)
 		}
-		writeJSON(w, 200, map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"result": []item{{ID: 42, Name: "found"}},
 			"meta":   map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
@@ -222,7 +222,7 @@ func TestGetByID_NotFound(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/items", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, 200, map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"result": []item{},
 			"meta":   map[string]any{"page": 1, "limit": 10, "total": 0},
 		})
@@ -262,7 +262,7 @@ func TestAll_BreakEarly(t *testing.T) {
 
 	mux.HandleFunc("GET /centreon/api/latest/items", func(w http.ResponseWriter, _ *http.Request) {
 		callCount++
-		writeJSON(w, 200, map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"result": []item{{ID: callCount}},
 			"meta":   map[string]any{"page": callCount, "limit": 1, "total": 100},
 		})

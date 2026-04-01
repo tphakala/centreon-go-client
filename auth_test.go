@@ -27,7 +27,7 @@ func TestLogin_Success(t *testing.T) {
 			t.Errorf("password = %q, want %q", req.Security.Credentials.Password, "secret")
 		}
 
-		writeJSON(w, 200, loginResponse{
+		writeJSON(w, http.StatusOK, loginResponse{
 			Security: loginSecurityResponse{Token: "new-token-123"},
 		})
 	})
@@ -60,7 +60,7 @@ func TestLogin_BadCredentials(t *testing.T) {
 	c.password = "wrong"
 
 	mux.HandleFunc("POST /centreon/api/latest/login", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, 401, map[string]any{"code": 1, "message": "bad credentials"})
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"code": 1, "message": "bad credentials"})
 	})
 
 	err := c.Login(t.Context())
@@ -78,7 +78,7 @@ func TestAutoRenew_On401(t *testing.T) {
 	var hostCalls atomic.Int32
 
 	mux.HandleFunc("POST /centreon/api/latest/login", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, 200, loginResponse{
+		writeJSON(w, http.StatusOK, loginResponse{
 			Security: loginSecurityResponse{Token: "fresh-token"},
 		})
 	})
@@ -92,14 +92,14 @@ func TestAutoRenew_On401(t *testing.T) {
 			if token != "expired-token" {
 				t.Errorf("first call token = %q, want %q", token, "expired-token")
 			}
-			w.WriteHeader(401)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		// Second call: should have fresh token
 		if token != "fresh-token" {
 			t.Errorf("second call token = %q, want %q", token, "fresh-token")
 		}
-		writeJSON(w, 200, map[string]string{"status": "ok"})
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
 	var result map[string]string
@@ -119,7 +119,7 @@ func TestLogout_ClearsToken(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/logout", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	})
 
 	err := c.Logout(t.Context())

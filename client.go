@@ -13,6 +13,11 @@ import (
 	"time"
 )
 
+const (
+	defaultTimeout  = 30 * time.Second
+	httpStatusError = 400
+)
+
 // Client is a Centreon Web REST API client.
 type Client struct {
 	baseURL    string
@@ -59,7 +64,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c := &Client{
 		baseURL:    strings.TrimRight(u.String(), "/"),
 		apiVersion: "latest",
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		httpClient: &http.Client{Timeout: defaultTimeout},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -113,7 +118,7 @@ func (c *Client) buildURL(path string) string {
 
 // sendRequest builds and executes an HTTP request. It marshals body to JSON
 // if non-nil and sets the appropriate headers.
-func (c *Client) sendRequest(ctx context.Context, method, url string, body any) (*http.Response, error) {
+func (c *Client) sendRequest(ctx context.Context, method, reqURL string, body any) (*http.Response, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -123,7 +128,7 @@ func (c *Client) sendRequest(ctx context.Context, method, url string, body any) 
 		bodyReader = bytes.NewReader(data)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("centreon: create request: %w", err)
 	}
@@ -155,7 +160,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 
 	// Auto-renew on 401 if credentials are available
 	if resp.StatusCode == http.StatusUnauthorized && c.username != "" {
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck // best-effort cleanup before retry
 		if loginErr := c.login(ctx); loginErr != nil {
 			return loginErr
 		}
@@ -164,9 +169,9 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 			return err
 		}
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode >= httpStatusError {
 		return parseError(resp)
 	}
 
@@ -193,12 +198,12 @@ func (c *Client) post(ctx context.Context, path string, body, result any) error 
 	return c.do(ctx, http.MethodPost, path, body, result)
 }
 
-func (c *Client) put(ctx context.Context, path string, body, result any) error {
-	return c.do(ctx, http.MethodPut, path, body, result)
+func (c *Client) put(ctx context.Context, path string, body any) error {
+	return c.do(ctx, http.MethodPut, path, body, nil)
 }
 
-func (c *Client) patch(ctx context.Context, path string, body, result any) error {
-	return c.do(ctx, http.MethodPatch, path, body, result)
+func (c *Client) patch(ctx context.Context, path string, body any) error {
+	return c.do(ctx, http.MethodPatch, path, body, nil)
 }
 
 func (c *Client) delete(ctx context.Context, path string) error {

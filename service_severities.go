@@ -62,7 +62,7 @@ func (s *ServiceSeverityService) Create(ctx context.Context, req CreateServiceSe
 
 // Update replaces an existing service severity using PUT.
 func (s *ServiceSeverityService) Update(ctx context.Context, id int, req UpdateServiceSeverityRequest) error {
-	return s.client.put(ctx, fmt.Sprintf("/configuration/services/severities/%d", id), req, nil)
+	return s.client.put(ctx, fmt.Sprintf("/configuration/services/severities/%d", id), req)
 }
 
 // Delete deletes a service severity by ID.

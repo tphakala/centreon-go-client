@@ -71,7 +71,7 @@ func (s *HostSeverityService) Create(ctx context.Context, req CreateHostSeverity
 
 // Update replaces an existing host severity using PUT.
 func (s *HostSeverityService) Update(ctx context.Context, id int, req UpdateHostSeverityRequest) error {
-	return s.client.put(ctx, fmt.Sprintf("/configuration/hosts/severities/%d", id), req, nil)
+	return s.client.put(ctx, fmt.Sprintf("/configuration/hosts/severities/%d", id), req)
 }
 
 // Delete deletes a host severity by ID.
