@@ -23,6 +23,9 @@ type Client struct {
 	token    string
 	username string
 	password string
+
+	MonitoringServers *MonitoringServerService
+	Commands          *CommandService
 }
 
 // Option configures a Client.
@@ -47,6 +50,8 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	for _, opt := range opts {
 		opt(c)
 	}
+	c.MonitoringServers = &MonitoringServerService{client: c}
+	c.Commands = &CommandService{client: c}
 	return c, nil
 }
 
