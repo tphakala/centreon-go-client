@@ -39,11 +39,12 @@ func TestMonitoringServiceService_StatusCounts(t *testing.T) {
 
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/services/status", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, ServiceStatusCount{
-			OK:       50,
-			Warning:  5,
-			Critical: 2,
-			Unknown:  1,
-			Pending:  3,
+			OK:       StatusValue{Total: 50},
+			Warning:  StatusValue{Total: 5},
+			Critical: StatusValue{Total: 2},
+			Unknown:  StatusValue{Total: 1},
+			Pending:  StatusValue{Total: 3},
+			Total:    61,
 		})
 	})
 
@@ -51,13 +52,16 @@ func TestMonitoringServiceService_StatusCounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StatusCounts: %v", err)
 	}
-	if counts.OK != 50 {
-		t.Errorf("OK = %d, want 50", counts.OK)
+	if counts.OK.Total != 50 {
+		t.Errorf("OK.Total = %d, want 50", counts.OK.Total)
 	}
-	if counts.Warning != 5 {
-		t.Errorf("Warning = %d, want 5", counts.Warning)
+	if counts.Warning.Total != 5 {
+		t.Errorf("Warning.Total = %d, want 5", counts.Warning.Total)
 	}
-	if counts.Critical != 2 {
-		t.Errorf("Critical = %d, want 2", counts.Critical)
+	if counts.Critical.Total != 2 {
+		t.Errorf("Critical.Total = %d, want 2", counts.Critical.Total)
+	}
+	if counts.Total != 61 {
+		t.Errorf("Total = %d, want 61", counts.Total)
 	}
 }

@@ -16,12 +16,18 @@ type MonitoringHost struct {
 	Status  ResourceStatus `json:"status"`
 }
 
+// StatusValue holds a count with a total subfield, as returned by the Centreon API.
+type StatusValue struct {
+	Total int `json:"total"`
+}
+
 // HostStatusCount holds status counts for hosts.
 type HostStatusCount struct {
-	Up          int `json:"up"`
-	Down        int `json:"down"`
-	Unreachable int `json:"unreachable"`
-	Pending     int `json:"pending"`
+	Up          StatusValue `json:"up"`
+	Down        StatusValue `json:"down"`
+	Unreachable StatusValue `json:"unreachable"`
+	Pending     StatusValue `json:"pending"`
+	Total       int         `json:"total"`
 }
 
 // TimelineEvent represents an event in a resource's timeline.

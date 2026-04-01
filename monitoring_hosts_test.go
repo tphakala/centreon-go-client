@@ -74,10 +74,11 @@ func TestMonitoringHostService_StatusCounts(t *testing.T) {
 
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/status", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, HostStatusCount{
-			Up:          10,
-			Down:        2,
-			Unreachable: 1,
-			Pending:     0,
+			Up:          StatusValue{Total: 10},
+			Down:        StatusValue{Total: 2},
+			Unreachable: StatusValue{Total: 1},
+			Pending:     StatusValue{Total: 0},
+			Total:       13,
 		})
 	})
 
@@ -85,14 +86,17 @@ func TestMonitoringHostService_StatusCounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StatusCounts: %v", err)
 	}
-	if counts.Up != 10 {
-		t.Errorf("Up = %d, want 10", counts.Up)
+	if counts.Up.Total != 10 {
+		t.Errorf("Up.Total = %d, want 10", counts.Up.Total)
 	}
-	if counts.Down != 2 {
-		t.Errorf("Down = %d, want 2", counts.Down)
+	if counts.Down.Total != 2 {
+		t.Errorf("Down.Total = %d, want 2", counts.Down.Total)
 	}
-	if counts.Unreachable != 1 {
-		t.Errorf("Unreachable = %d, want 1", counts.Unreachable)
+	if counts.Unreachable.Total != 1 {
+		t.Errorf("Unreachable.Total = %d, want 1", counts.Unreachable.Total)
+	}
+	if counts.Total != 13 {
+		t.Errorf("Total = %d, want 13", counts.Total)
 	}
 }
 

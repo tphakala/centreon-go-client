@@ -14,11 +14,12 @@ type MonitoringService struct {
 
 // ServiceStatusCount holds status counts for services.
 type ServiceStatusCount struct {
-	OK       int `json:"ok"`
-	Warning  int `json:"warning"`
-	Critical int `json:"critical"`
-	Unknown  int `json:"unknown"`
-	Pending  int `json:"pending"`
+	OK       StatusValue `json:"ok"`
+	Warning  StatusValue `json:"warning"`
+	Critical StatusValue `json:"critical"`
+	Unknown  StatusValue `json:"unknown"`
+	Pending  StatusValue `json:"pending"`
+	Total    int         `json:"total"`
 }
 
 // MonitoringServiceService provides access to the monitoring services endpoints.
