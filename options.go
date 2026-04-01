@@ -3,6 +3,7 @@ package centreon
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"iter"
 	"net/url"
 	"strconv"
@@ -64,7 +65,7 @@ func applyOptions(opts []ListOption) *ListOptions {
 }
 
 // queryParams converts ListOptions into URL query parameters.
-func (o *ListOptions) queryParams() url.Values {
+func (o *ListOptions) queryParams() (url.Values, error) {
 	q := url.Values{}
 	if o.Page > 0 {
 		q.Set("page", strconv.Itoa(o.Page))
@@ -74,23 +75,28 @@ func (o *ListOptions) queryParams() url.Values {
 	}
 	if o.Search != nil {
 		data, err := json.Marshal(o.Search.Build())
-		if err == nil {
-			q.Set("search", string(data))
+		if err != nil {
+			return nil, fmt.Errorf("centreon: marshal search filter: %w", err)
 		}
+		q.Set("search", string(data))
 	}
 	if len(o.SortBy) > 0 {
 		data, err := json.Marshal(o.SortBy)
-		if err == nil {
-			q.Set("sort_by", string(data))
+		if err != nil {
+			return nil, fmt.Errorf("centreon: marshal sort_by: %w", err)
 		}
+		q.Set("sort_by", string(data))
 	}
-	return q
+	return q, nil
 }
 
 // list performs a paginated GET request and decodes into result.
 func (c *Client) list(ctx context.Context, path string, opts []ListOption, result any) error {
 	o := applyOptions(opts)
-	q := o.queryParams()
+	q, err := o.queryParams()
+	if err != nil {
+		return err
+	}
 	fullPath := path
 	if encoded := q.Encode(); encoded != "" {
 		fullPath = path + "?" + encoded

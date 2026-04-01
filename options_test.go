@@ -10,7 +10,10 @@ import (
 
 func TestQueryParams_Empty(t *testing.T) {
 	opts := &ListOptions{}
-	q := opts.queryParams()
+	q, err := opts.queryParams()
+	if err != nil {
+		t.Fatalf("queryParams: %v", err)
+	}
 	if len(q) != 0 {
 		t.Errorf("expected empty query params, got %v", q)
 	}
@@ -18,7 +21,10 @@ func TestQueryParams_Empty(t *testing.T) {
 
 func TestQueryParams_Page(t *testing.T) {
 	opts := &ListOptions{Page: 2, Limit: 50}
-	q := opts.queryParams()
+	q, err := opts.queryParams()
+	if err != nil {
+		t.Fatalf("queryParams: %v", err)
+	}
 	if q.Get("page") != "2" {
 		t.Errorf("page = %q, want %q", q.Get("page"), "2")
 	}
@@ -29,7 +35,10 @@ func TestQueryParams_Page(t *testing.T) {
 
 func TestQueryParams_Search(t *testing.T) {
 	opts := &ListOptions{Search: Eq("name", "host1")}
-	q := opts.queryParams()
+	q, err := opts.queryParams()
+	if err != nil {
+		t.Fatalf("queryParams: %v", err)
+	}
 	got := q.Get("search")
 	want := `{"name":{"$eq":"host1"}}`
 	if got != want {
@@ -39,7 +48,10 @@ func TestQueryParams_Search(t *testing.T) {
 
 func TestQueryParams_Sort(t *testing.T) {
 	opts := &ListOptions{SortBy: map[string]string{"name": "asc"}}
-	q := opts.queryParams()
+	q, err := opts.queryParams()
+	if err != nil {
+		t.Fatalf("queryParams: %v", err)
+	}
 	got := q.Get("sort_by")
 	// Parse to avoid map ordering issues
 	var m map[string]string

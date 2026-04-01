@@ -134,6 +134,7 @@ func (c *Client) sendRequest(ctx context.Context, method, reqURL string, body an
 	}
 
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "centreon-go-client")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
