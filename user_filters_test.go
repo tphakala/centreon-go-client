@@ -68,7 +68,7 @@ func TestUserFilterService_Create(t *testing.T) {
 	mux.HandleFunc("POST /centreon/api/latest/users/filters", func(w http.ResponseWriter, r *http.Request) {
 		var req CreateUserFilterRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+			t.Fatalf("decode body: %v", err)
 		}
 		if req.Name != "new-filter" {
 			t.Errorf("Name = %q, want %q", req.Name, "new-filter")
@@ -93,7 +93,7 @@ func TestUserFilterService_Update(t *testing.T) {
 	mux.HandleFunc("PUT /centreon/api/latest/users/filters/3", func(w http.ResponseWriter, r *http.Request) {
 		var req UpdateUserFilterRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+			t.Fatalf("decode body: %v", err)
 		}
 		if req.Name != "updated-filter" {
 			t.Errorf("Name = %q, want %q", req.Name, "updated-filter")
@@ -113,7 +113,7 @@ func TestUserFilterService_Patch(t *testing.T) {
 	mux.HandleFunc("PATCH /centreon/api/latest/users/filters/3", func(w http.ResponseWriter, r *http.Request) {
 		var req PatchUserFilterRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+			t.Fatalf("decode body: %v", err)
 		}
 		if req.Name == nil || *req.Name != "patched-filter" {
 			t.Errorf("Name = %v, want %q", req.Name, "patched-filter")

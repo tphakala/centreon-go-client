@@ -140,6 +140,9 @@ func TestTimePeriodService_Update(t *testing.T) {
 		if req.Name != "updated-hours" {
 			t.Errorf("Name = %q, want %q", req.Name, "updated-hours")
 		}
+		if req.Alias != "Updated Hours" {
+			t.Errorf("Alias = %q, want %q", req.Alias, "Updated Hours")
+		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 

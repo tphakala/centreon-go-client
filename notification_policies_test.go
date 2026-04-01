@@ -59,4 +59,10 @@ func TestNotificationPolicyService_GetForService(t *testing.T) {
 	if np.IsNotificationEnabled {
 		t.Error("IsNotificationEnabled = true, want false")
 	}
+	if len(np.Users) != 0 {
+		t.Errorf("len(Users) = %d, want 0", len(np.Users))
+	}
+	if len(np.ContactGroups) != 0 {
+		t.Errorf("len(ContactGroups) = %d, want 0", len(np.ContactGroups))
+	}
 }
