@@ -35,6 +35,7 @@ type Client struct {
 	ServiceGroups      *ServiceGroupService
 	ServiceCategories  *ServiceCategoryService
 	ServiceSeverities  *ServiceSeverityService
+	ServiceTemplates   *ServiceTemplateService
 }
 
 // Option configures a Client.
@@ -70,6 +71,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.ServiceGroups = &ServiceGroupService{client: c}
 	c.ServiceCategories = &ServiceCategoryService{client: c}
 	c.ServiceSeverities = &ServiceSeverityService{client: c}
+	c.ServiceTemplates = &ServiceTemplateService{client: c}
 	return c, nil
 }
 
