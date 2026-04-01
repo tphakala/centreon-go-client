@@ -18,7 +18,7 @@ func TestOperationsService_Acknowledge(t *testing.T) {
 			t.Errorf("decode body: %v", err)
 		}
 		if len(req.Resources) != 1 {
-			t.Errorf("len(Resources) = %d, want 1", len(req.Resources))
+			t.Fatalf("len(Resources) = %d, want 1", len(req.Resources))
 		}
 		if req.Resources[0].Type != "host" {
 			t.Errorf("Resources[0].Type = %q, want %q", req.Resources[0].Type, "host")
@@ -104,7 +104,7 @@ func TestOperationsService_Check(t *testing.T) {
 			t.Errorf("decode body: %v", err)
 		}
 		if len(req.Resources) != 1 {
-			t.Errorf("len(Resources) = %d, want 1", len(req.Resources))
+			t.Fatalf("len(Resources) = %d, want 1", len(req.Resources))
 		}
 		if req.Resources[0].Type != "service" {
 			t.Errorf("Resources[0].Type = %q, want %q", req.Resources[0].Type, "service")
@@ -142,7 +142,7 @@ func TestOperationsService_Submit(t *testing.T) {
 			t.Errorf("decode body: %v", err)
 		}
 		if len(req.Resources) != 1 {
-			t.Errorf("len(Resources) = %d, want 1", len(req.Resources))
+			t.Fatalf("len(Resources) = %d, want 1", len(req.Resources))
 		}
 		res := req.Resources[0]
 		if res.Type != "service" {
@@ -191,7 +191,7 @@ func TestOperationsService_Comment(t *testing.T) {
 			t.Errorf("decode body: %v", err)
 		}
 		if len(req.Resources) != 1 {
-			t.Errorf("len(Resources) = %d, want 1", len(req.Resources))
+			t.Fatalf("len(Resources) = %d, want 1", len(req.Resources))
 		}
 		if req.Resources[0].Type != "host" {
 			t.Errorf("Resources[0].Type = %q, want %q", req.Resources[0].Type, "host")

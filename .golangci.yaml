@@ -42,6 +42,7 @@ linters:
     - predeclared
     - recvcheck
     - revive
+    - gosec
     - sloglint
     - staticcheck
     - thelper

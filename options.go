@@ -104,6 +104,24 @@ func (c *Client) list(ctx context.Context, path string, opts []ListOption, resul
 	return c.get(ctx, fullPath, result)
 }
 
+// isLastPage determines whether the current page is the final one.
+func isLastPage(page, userLimit int, meta Meta, resultCount int) bool {
+	pageSize := userLimit
+	if pageSize <= 0 {
+		pageSize = meta.Limit
+	}
+	if pageSize <= 0 {
+		pageSize = resultCount
+	}
+	if pageSize <= 0 {
+		return true
+	}
+	if meta.Total > 0 {
+		return page*pageSize >= meta.Total
+	}
+	return resultCount < pageSize
+}
+
 // all returns an iterator that fetches all pages of a list endpoint.
 func all[T any](
 	ctx context.Context,
@@ -112,9 +130,7 @@ func all[T any](
 ) iter.Seq2[*T, error] {
 	return func(yield func(*T, error) bool) {
 		page := 1
-		// Extract the user's limit from opts, default to 0 (let server decide)
-		o := applyOptions(opts)
-		limit := o.Limit
+		userLimit := applyOptions(opts).Limit
 
 		for {
 			pageOpts := make([]ListOption, 0, len(opts)+1)
@@ -133,12 +149,7 @@ func all[T any](
 				}
 			}
 
-			// Determine if we've fetched all items
-			pageSize := limit
-			if pageSize <= 0 {
-				pageSize = resp.Meta.Limit
-			}
-			if pageSize <= 0 || page*pageSize >= resp.Meta.Total {
+			if isLastPage(page, userLimit, resp.Meta, len(resp.Result)) {
 				return
 			}
 			page++

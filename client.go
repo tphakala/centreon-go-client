@@ -29,14 +29,14 @@ type Client struct {
 	username string
 	password string
 
-	MonitoringServers *MonitoringServerService
-	Commands          *CommandService
-	Hosts             *HostService
-	HostGroups        *HostGroupService
-	HostCategories    *HostCategoryService
-	HostSeverities    *HostSeverityService
-	HostTemplates     *HostTemplateService
-	Services          *ServiceService
+	MonitoringServers  *MonitoringServerService
+	Commands           *CommandService
+	Hosts              *HostService
+	HostGroups         *HostGroupService
+	HostCategories     *HostCategoryService
+	HostSeverities     *HostSeverityService
+	HostTemplates      *HostTemplateService
+	Services           *ServiceService
 	ServiceGroups      *ServiceGroupService
 	ServiceCategories  *ServiceCategoryService
 	ServiceSeverities  *ServiceSeverityService

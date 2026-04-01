@@ -74,13 +74,22 @@ func (c *Client) login(ctx context.Context) error {
 }
 
 // Logout sends a logout request and clears the stored token.
-// The token is only cleared on a successful logout.
+// Uses sendRequest directly to avoid re-authenticating on 401.
 func (c *Client) Logout(ctx context.Context) error {
-	if err := c.get(ctx, "/logout", nil); err != nil {
+	fullURL := c.buildURL("/logout")
+	resp, err := c.sendRequest(ctx, http.MethodGet, fullURL, nil)
+	if err != nil {
 		return err
 	}
+	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
+
+	// Always clear the local token — we're logging out regardless
 	c.mu.Lock()
 	c.token = ""
 	c.mu.Unlock()
+
+	if resp.StatusCode >= httpStatusError && resp.StatusCode != http.StatusUnauthorized {
+		return parseError(resp)
+	}
 	return nil
 }
