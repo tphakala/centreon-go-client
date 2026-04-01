@@ -63,7 +63,7 @@
 // Resources use either PATCH (partial update) or PUT (full replacement):
 //
 //	// PATCH — only specified fields are changed
-//	client.Hosts.Update(ctx, id, centreon.UpdateHostRequest{
+//	client.Hosts.Update(ctx, id, &centreon.UpdateHostRequest{
 //	    Alias: new("updated"),
 //	})
 //

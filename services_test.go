@@ -96,7 +96,7 @@ func TestServiceService_Create(t *testing.T) {
 		writeJSON(w, http.StatusCreated, map[string]int{"id": 99})
 	})
 
-	id, err := c.Services.Create(t.Context(), CreateServiceRequest{
+	id, err := c.Services.Create(t.Context(), &CreateServiceRequest{
 		HostID: 10,
 		Name:   "new-service",
 	})
@@ -123,7 +123,7 @@ func TestServiceService_Update(t *testing.T) {
 	})
 
 	name := "updated-service"
-	err := c.Services.Update(t.Context(), 42, UpdateServiceRequest{Name: &name})
+	err := c.Services.Update(t.Context(), 42, &UpdateServiceRequest{Name: &name})
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -144,5 +144,85 @@ func TestServiceService_Delete(t *testing.T) {
 	}
 	if !called {
 		t.Error("handler was not called")
+	}
+}
+
+func checkServiceCreateRelations(t *testing.T, req *CreateServiceRequest) {
+	t.Helper()
+	if req.Name != "svc-with-template" {
+		t.Errorf("Name = %q, want %q", req.Name, "svc-with-template")
+	}
+	if req.HostID != 5 {
+		t.Errorf("HostID = %d, want 5", req.HostID)
+	}
+	if req.ServiceTemplateID != 100 {
+		t.Errorf("ServiceTemplateID = %d, want 100", req.ServiceTemplateID)
+	}
+	if len(req.ServiceCategories) != 2 || req.ServiceCategories[0] != 7 || req.ServiceCategories[1] != 8 {
+		t.Errorf("ServiceCategories = %v, want [7 8]", req.ServiceCategories)
+	}
+	if len(req.ServiceGroups) != 1 || req.ServiceGroups[0] != 4 {
+		t.Errorf("ServiceGroups = %v, want [4]", req.ServiceGroups)
+	}
+	if len(req.Macros) != 1 || req.Macros[0].Name != "WARNING" || req.Macros[0].Value != "80" {
+		t.Errorf("Macros = %+v, want [{Name:WARNING Value:80}]", req.Macros)
+	}
+}
+
+func TestServiceService_Create_WithTemplateAndCategories(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/configuration/services", func(w http.ResponseWriter, r *http.Request) {
+		var req CreateServiceRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		checkServiceCreateRelations(t, &req)
+		writeJSON(w, http.StatusCreated, map[string]int{"id": 55})
+	})
+
+	id, err := c.Services.Create(t.Context(), &CreateServiceRequest{
+		HostID:            5,
+		Name:              "svc-with-template",
+		ServiceTemplateID: 100,
+		ServiceCategories: []int{7, 8},
+		ServiceGroups:     []int{4},
+		Macros:            []Macro{{Name: "WARNING", Value: "80"}},
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if id != 55 {
+		t.Errorf("id = %d, want 55", id)
+	}
+}
+
+func TestServiceService_Update_WithRelationshipFields(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("PATCH /centreon/api/latest/configuration/services/20", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		for _, key := range []string{"service_categories", "service_template_id", "macros"} {
+			if _, ok := body[key]; !ok {
+				t.Errorf("expected %q key in PATCH body", key)
+			}
+		}
+		if _, ok := body["name"]; ok {
+			t.Error("unexpected 'name' key in PATCH body")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	tmplID := 200
+	err := c.Services.Update(t.Context(), 20, &UpdateServiceRequest{
+		ServiceTemplateID: &tmplID,
+		ServiceCategories: &[]int{9, 10},
+		Macros:            &[]Macro{{Name: "CRITICAL", Value: "95"}},
+	})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
 	}
 }

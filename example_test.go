@@ -69,7 +69,8 @@ func ExampleHostService_List() {
 		log.Fatal(err)
 	}
 
-	for _, h := range resp.Result {
+	for i := range resp.Result {
+		h := &resp.Result[i]
 		fmt.Printf("%d: %s (%s)\n", h.ID, h.Name, h.Address)
 	}
 }
@@ -95,7 +96,7 @@ func ExampleHostService_Create() {
 		centreon.WithAPIToken("token"),
 	)
 
-	id, err := client.Hosts.Create(ctx, centreon.CreateHostRequest{
+	id, err := client.Hosts.Create(ctx, &centreon.CreateHostRequest{
 		MonitoringServerID: 1,
 		Name:               "new-host",
 		Address:            "192.168.1.100",
@@ -113,7 +114,7 @@ func ExampleHostService_Update() {
 	)
 
 	// PATCH — only specified fields are changed
-	err := client.Hosts.Update(ctx, 42, centreon.UpdateHostRequest{
+	err := client.Hosts.Update(ctx, 42, &centreon.UpdateHostRequest{
 		Alias: new("Production Server"),
 	})
 	if err != nil {

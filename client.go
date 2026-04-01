@@ -31,6 +31,10 @@ type Client struct {
 	password string
 	logger   *slog.Logger
 
+	// loginMu serializes concurrent re-authentication attempts so that only
+	// one goroutine calls login() at a time (prevents thundering herd on 401).
+	loginMu sync.Mutex
+
 	MonitoringServers    *MonitoringServerService
 	Commands             *CommandService
 	Hosts                *HostService
@@ -140,6 +144,14 @@ func WithLogger(l *slog.Logger) Option {
 	return func(c *Client) { c.logger = l }
 }
 
+// Token returns the current authentication token.
+// This can be used to cache the token for external use.
+func (c *Client) Token() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.token
+}
+
 // buildURL constructs the full API URL for the given path.
 func (c *Client) buildURL(path string) string {
 	return fmt.Sprintf("%s/centreon/api/%s%s", c.baseURL, c.apiVersion, path)
@@ -186,8 +198,16 @@ func (c *Client) sendRequest(ctx context.Context, method, reqURL string, body an
 
 // do is the core request method. It sends a request and decodes the response.
 // On 401, it attempts to re-authenticate via login() and retries once.
+// To avoid a thundering herd when many goroutines get 401 simultaneously,
+// it compares the token before the request to the current token: if another
+// goroutine already refreshed the token, it skips login and just retries.
 func (c *Client) do(ctx context.Context, method, path string, body, result any) error {
 	fullURL := c.buildURL(path)
+
+	// Capture token before sending so we can detect concurrent refreshes.
+	c.mu.Lock()
+	tokenBefore := c.token
+	c.mu.Unlock()
 
 	resp, err := c.sendRequest(ctx, method, fullURL, body)
 	if err != nil {
@@ -197,10 +217,27 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 	// Auto-renew on 401 if credentials are available
 	if resp.StatusCode == http.StatusUnauthorized && c.username != "" {
 		resp.Body.Close() //nolint:errcheck // best-effort cleanup before retry
-		c.logInfo(ctx, "token expired, re-authenticating")
-		if loginErr := c.login(ctx); loginErr != nil {
-			return loginErr
+
+		// loginMu serializes concurrent re-authentication so only one goroutine
+		// calls login(); others wait and then retry with the refreshed token.
+		c.loginMu.Lock()
+		c.mu.Lock()
+		tokenNow := c.token
+		c.mu.Unlock()
+
+		if tokenNow == tokenBefore {
+			// Token has not been refreshed by another goroutine; do it now.
+			c.logInfo(ctx, "token expired, re-authenticating")
+			loginErr := c.login(ctx)
+			c.loginMu.Unlock()
+			if loginErr != nil {
+				return loginErr
+			}
+		} else {
+			// Another goroutine already refreshed; just retry with the new token.
+			c.loginMu.Unlock()
 		}
+
 		resp, err = c.sendRequest(ctx, method, fullURL, body)
 		if err != nil {
 			return err

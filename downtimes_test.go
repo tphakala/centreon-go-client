@@ -264,6 +264,32 @@ func TestDowntimeService_CreateForService(t *testing.T) {
 	}
 }
 
+func TestDowntimeService_CreateForHost_WithServices(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/downtimes", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if body["with_services"] != true {
+			t.Errorf("with_services = %v, want true", body["with_services"])
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := c.Downtimes.CreateForHost(t.Context(), 10, &CreateDowntimeRequest{
+		Comment:      "test",
+		StartTime:    time.Now(),
+		EndTime:      time.Now().Add(time.Hour),
+		IsFixed:      true,
+		WithServices: true,
+	})
+	if err != nil {
+		t.Fatalf("CreateForHost: %v", err)
+	}
+}
+
 func TestDowntimeService_CancelForHost(t *testing.T) {
 	mux, c := newTestMux(t)
 

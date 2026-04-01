@@ -223,6 +223,29 @@ func TestAcknowledgementService_CreateForService(t *testing.T) {
 	}
 }
 
+func TestAcknowledgementService_CreateForHost_WithServices(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/acknowledgements", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if body["with_services"] != true {
+			t.Errorf("with_services = %v, want true", body["with_services"])
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := c.Acknowledgements.CreateForHost(t.Context(), 10, &CreateAcknowledgementRequest{
+		Comment:      "test ack",
+		WithServices: true,
+	})
+	if err != nil {
+		t.Fatalf("CreateForHost: %v", err)
+	}
+}
+
 func TestAcknowledgementService_CancelForHost(t *testing.T) {
 	mux, c := newTestMux(t)
 

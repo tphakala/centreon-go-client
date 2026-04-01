@@ -6,6 +6,14 @@ import (
 	"iter"
 )
 
+// Macro represents a custom host or service macro.
+type Macro struct {
+	Name        string `json:"name"`
+	Value       string `json:"value,omitzero"`
+	IsPassword  bool   `json:"is_password"`
+	Description string `json:"description,omitzero"`
+}
+
 // Host represents a Centreon host configuration resource.
 type Host struct {
 	ID                  int    `json:"id"`
@@ -19,28 +27,79 @@ type Host struct {
 	RetryCheckInterval  int    `json:"retry_check_interval,omitzero"`
 	ActiveChecksEnabled *bool  `json:"active_checks_enabled"`
 	IsActivated         bool   `json:"is_activated"`
+	SNMPCommunity       string `json:"snmp_community,omitzero"`
+	SNMPVersion         string `json:"snmp_version,omitzero"`
+	TimezoneID          int    `json:"timezone_id,omitzero"`
+	SeverityID          int    `json:"severity_id,omitzero"`
+	Comment             string `json:"comment,omitzero"`
+	GeoCoords           string `json:"geo_coords,omitzero"`
 }
 
 // CreateHostRequest is the request body for creating a host.
 type CreateHostRequest struct {
+	// Required
 	MonitoringServerID int    `json:"monitoring_server_id"`
 	Name               string `json:"name"`
 	Address            string `json:"address"`
-	Alias              string `json:"alias,omitzero"`
-	CheckCommandID     int    `json:"check_command_id,omitzero"`
+
+	// Optional basic
+	Alias       string `json:"alias,omitzero"`
+	Comment     string `json:"comment,omitzero"`
+	GeoCoords   string `json:"geo_coords,omitzero"`
+	IsActivated *bool  `json:"is_activated,omitempty"`
+
+	// Monitoring config
+	CheckCommandID      int      `json:"check_command_id,omitzero"`
+	CheckCommandArgs    []string `json:"check_command_args,omitzero"`
+	CheckTimeperiodID   int      `json:"check_timeperiod_id,omitzero"`
+	MaxCheckAttempts    int      `json:"max_check_attempts,omitzero"`
+	NormalCheckInterval int      `json:"normal_check_interval,omitzero"`
+	RetryCheckInterval  int      `json:"retry_check_interval,omitzero"`
+
+	// SNMP
+	SNMPCommunity string `json:"snmp_community,omitzero"`
+	SNMPVersion   string `json:"snmp_version,omitzero"`
+
+	// Notifications
+	NotificationEnabled      int `json:"notification_enabled,omitzero"`
+	NotificationOptions      int `json:"notification_options,omitzero"`
+	NotificationInterval     int `json:"notification_interval,omitzero"`
+	NotificationTimeperiodID int `json:"notification_timeperiod_id,omitzero"`
+
+	// References
+	TimezoneID int `json:"timezone_id,omitzero"`
+	SeverityID int `json:"severity_id,omitzero"`
+	IconID     int `json:"icon_id,omitzero"`
+
+	// Relationships
+	Templates  []int   `json:"templates,omitzero"`
+	Groups     []int   `json:"groups,omitzero"`
+	Categories []int   `json:"categories,omitzero"`
+	Macros     []Macro `json:"macros,omitzero"`
 }
 
 // UpdateHostRequest is the request body for updating a host (PATCH).
 type UpdateHostRequest struct {
-	Name                *string `json:"name,omitempty"`
-	Alias               *string `json:"alias,omitempty"`
-	Address             *string `json:"address,omitempty"`
-	CheckCommandID      *int    `json:"check_command_id,omitempty"`
-	MaxCheckAttempts    *int    `json:"max_check_attempts,omitempty"`
-	NormalCheckInterval *int    `json:"normal_check_interval,omitempty"`
-	RetryCheckInterval  *int    `json:"retry_check_interval,omitempty"`
-	ActiveChecksEnabled *bool   `json:"active_checks_enabled,omitempty"`
-	IsActivated         *bool   `json:"is_activated,omitempty"`
+	Name                *string   `json:"name,omitempty"`
+	Alias               *string   `json:"alias,omitempty"`
+	Address             *string   `json:"address,omitempty"`
+	CheckCommandID      *int      `json:"check_command_id,omitempty"`
+	CheckCommandArgs    *[]string `json:"check_command_args,omitempty"`
+	CheckTimeperiodID   *int      `json:"check_timeperiod_id,omitempty"`
+	MaxCheckAttempts    *int      `json:"max_check_attempts,omitempty"`
+	NormalCheckInterval *int      `json:"normal_check_interval,omitempty"`
+	RetryCheckInterval  *int      `json:"retry_check_interval,omitempty"`
+	ActiveChecksEnabled *bool     `json:"active_checks_enabled,omitempty"`
+	IsActivated         *bool     `json:"is_activated,omitempty"`
+	SNMPCommunity       *string   `json:"snmp_community,omitempty"`
+	SNMPVersion         *string   `json:"snmp_version,omitempty"`
+	NotificationEnabled *int      `json:"notification_enabled,omitempty"`
+	TimezoneID          *int      `json:"timezone_id,omitempty"`
+	SeverityID          *int      `json:"severity_id,omitempty"`
+	Templates           *[]int    `json:"templates,omitempty"`
+	Groups              *[]int    `json:"groups,omitempty"`
+	Categories          *[]int    `json:"categories,omitempty"`
+	Macros              *[]Macro  `json:"macros,omitempty"`
 }
 
 // HostService provides host configuration operations.
@@ -67,7 +126,7 @@ func (s *HostService) GetByID(ctx context.Context, id int) (*Host, error) {
 }
 
 // Create creates a new host and returns its ID.
-func (s *HostService) Create(ctx context.Context, req CreateHostRequest) (int, error) {
+func (s *HostService) Create(ctx context.Context, req *CreateHostRequest) (int, error) {
 	var result struct {
 		ID int `json:"id"`
 	}
@@ -78,7 +137,7 @@ func (s *HostService) Create(ctx context.Context, req CreateHostRequest) (int, e
 }
 
 // Update updates an existing host using PATCH.
-func (s *HostService) Update(ctx context.Context, id int, req UpdateHostRequest) error {
+func (s *HostService) Update(ctx context.Context, id int, req *UpdateHostRequest) error {
 	return s.client.patch(ctx, fmt.Sprintf("/configuration/hosts/%d", id), req)
 }
 

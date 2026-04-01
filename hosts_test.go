@@ -123,7 +123,7 @@ func TestHostService_Create(t *testing.T) {
 		writeJSON(w, http.StatusCreated, map[string]int{"id": 99})
 	})
 
-	id, err := c.Hosts.Create(t.Context(), CreateHostRequest{
+	id, err := c.Hosts.Create(t.Context(), &CreateHostRequest{
 		Name:               "new-host",
 		MonitoringServerID: 1,
 		Address:            "10.0.0.99",
@@ -151,7 +151,7 @@ func TestHostService_Update(t *testing.T) {
 	})
 
 	name := "updated-host"
-	err := c.Hosts.Update(t.Context(), 42, UpdateHostRequest{Name: &name})
+	err := c.Hosts.Update(t.Context(), 42, &UpdateHostRequest{Name: &name})
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -172,5 +172,106 @@ func TestHostService_Delete(t *testing.T) {
 	}
 	if !called {
 		t.Error("handler was not called")
+	}
+}
+
+func checkHostCreateFields(t *testing.T, req *CreateHostRequest) {
+	t.Helper()
+	if req.Name != "host-with-relations" {
+		t.Errorf("Name = %q, want %q", req.Name, "host-with-relations")
+	}
+	if req.MonitoringServerID != 2 {
+		t.Errorf("MonitoringServerID = %d, want 2", req.MonitoringServerID)
+	}
+	if req.SNMPCommunity != "public" || req.SNMPVersion != "2c" {
+		t.Errorf("SNMP = (%q, %q), want (public, 2c)", req.SNMPCommunity, req.SNMPVersion)
+	}
+}
+
+func checkHostCreateSlices(t *testing.T, req *CreateHostRequest) {
+	t.Helper()
+	if len(req.Templates) != 2 || req.Templates[0] != 10 || req.Templates[1] != 20 {
+		t.Errorf("Templates = %v, want [10 20]", req.Templates)
+	}
+	if len(req.Groups) != 1 || req.Groups[0] != 5 {
+		t.Errorf("Groups = %v, want [5]", req.Groups)
+	}
+	if len(req.Categories) != 1 || req.Categories[0] != 3 {
+		t.Errorf("Categories = %v, want [3]", req.Categories)
+	}
+	if len(req.Macros) != 2 {
+		t.Errorf("len(Macros) = %d, want 2", len(req.Macros))
+		return
+	}
+	if req.Macros[0].Name != "COMMUNITY" || req.Macros[0].Value != "public" {
+		t.Errorf("Macros[0] = %+v, want {Name:COMMUNITY Value:public}", req.Macros[0])
+	}
+	if req.Macros[1].Name != "PASSWORD" || !req.Macros[1].IsPassword {
+		t.Errorf("Macros[1] = %+v, want {Name:PASSWORD IsPassword:true}", req.Macros[1])
+	}
+}
+
+func TestHostService_Create_WithTemplatesGroupsMacros(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/configuration/hosts", func(w http.ResponseWriter, r *http.Request) {
+		var req CreateHostRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		checkHostCreateFields(t, &req)
+		checkHostCreateSlices(t, &req)
+		writeJSON(w, http.StatusCreated, map[string]int{"id": 101})
+	})
+
+	id, err := c.Hosts.Create(t.Context(), &CreateHostRequest{
+		Name:               "host-with-relations",
+		MonitoringServerID: 2,
+		Address:            "192.168.1.10",
+		SNMPCommunity:      "public",
+		SNMPVersion:        "2c",
+		Templates:          []int{10, 20},
+		Groups:             []int{5},
+		Categories:         []int{3},
+		Macros: []Macro{
+			{Name: "COMMUNITY", Value: "public"},
+			{Name: "PASSWORD", IsPassword: true},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if id != 101 {
+		t.Errorf("id = %d, want 101", id)
+	}
+}
+
+func TestHostService_Update_WithRelationshipFields(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("PATCH /centreon/api/latest/configuration/hosts/10", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		for _, key := range []string{"templates", "macros", "snmp_community"} {
+			if _, ok := body[key]; !ok {
+				t.Errorf("expected %q key in PATCH body", key)
+			}
+		}
+		if _, ok := body["name"]; ok {
+			t.Error("unexpected 'name' key in PATCH body")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	community := "private"
+	err := c.Hosts.Update(t.Context(), 10, &UpdateHostRequest{
+		SNMPCommunity: &community,
+		Templates:     &[]int{100, 200},
+		Macros:        &[]Macro{{Name: "ENV", Value: "prod"}},
+	})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
 	}
 }
