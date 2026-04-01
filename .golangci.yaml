@@ -97,6 +97,16 @@ linters:
       - linters:
           - gocritic
         path: "example_test\\.go"
+      - linters:
+          - mnd
+          - gocritic
+          - unparam
+        path: "cmd/"
+      - linters:
+          - mnd
+          - gocritic
+          - unparam
+        path: "centreon-cli"
         text: "ruleguard"
 issues:
   max-issues-per-linter: 0
