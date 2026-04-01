@@ -1,0 +1,29 @@
+#!/bin/sh
+# Pre-commit hook: enforce formatting and linting
+
+set -e
+
+# Check gofmt
+UNFORMATTED=$(gofmt -l *.go 2>/dev/null || true)
+if [ -n "$UNFORMATTED" ]; then
+    echo "ERROR: Files not formatted with gofmt:"
+    echo "$UNFORMATTED"
+    echo "Run: gofmt -w *.go"
+    exit 1
+fi
+
+# Run go vet
+echo "Running go vet..."
+go vet ./...
+
+# Run tests
+echo "Running tests..."
+go test -count=1 ./...
+
+# Run golangci-lint if available
+if command -v golangci-lint >/dev/null 2>&1; then
+    echo "Running golangci-lint..."
+    golangci-lint run ./...
+fi
+
+echo "All checks passed."
