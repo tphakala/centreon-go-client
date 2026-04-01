@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -162,5 +164,55 @@ func TestToken_ReturnsPreConfiguredToken(t *testing.T) {
 	}
 	if got := c.Token(); got != "my-static-token" {
 		t.Errorf("Token() = %q, want %q", got, "my-static-token")
+	}
+}
+
+func TestConcurrent401_LoginCalledOnce(t *testing.T) {
+	mux, c := newTestMux(t)
+	c.username = "admin"
+	c.password = "secret"
+	c.token = "expired-token"
+
+	var loginCalls atomic.Int32
+
+	mux.HandleFunc("POST /centreon/api/latest/login", func(w http.ResponseWriter, _ *http.Request) {
+		loginCalls.Add(1)
+		writeJSON(w, http.StatusOK, loginResponse{
+			Security: loginSecurityResponse{Token: "fresh-token"},
+		})
+	})
+
+	// Return 401 for expired-token, 200 for fresh-token.
+	mux.HandleFunc("GET /centreon/api/latest/hosts", func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("X-AUTH-TOKEN")
+		if token == "expired-token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+
+	// Fire two concurrent requests that will both encounter the 401.
+	const goroutines = 2
+	errs := make([]error, goroutines)
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := range goroutines {
+		go func(i int) {
+			defer wg.Done()
+			var result map[string]string
+			errs[i] = c.get(t.Context(), "/hosts", &result)
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("goroutine %d: unexpected error: %v", i, err)
+		}
+	}
+
+	if n := loginCalls.Load(); n != 1 {
+		t.Errorf("login called %d times, want 1", n)
 	}
 }
