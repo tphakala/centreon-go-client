@@ -223,4 +223,4 @@ client, _ := centreon.NewClient(url, centreon.WithVersion("v24.04"))
 
 ## License
 
-MIT
+Apache License 2.0 — see [LICENSE](LICENSE) for details.
