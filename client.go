@@ -30,6 +30,7 @@ type Client struct {
 	HostGroups        *HostGroupService
 	HostCategories    *HostCategoryService
 	HostSeverities    *HostSeverityService
+	HostTemplates     *HostTemplateService
 }
 
 // Option configures a Client.
@@ -60,6 +61,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.HostGroups = &HostGroupService{client: c}
 	c.HostCategories = &HostCategoryService{client: c}
 	c.HostSeverities = &HostSeverityService{client: c}
+	c.HostTemplates = &HostTemplateService{client: c}
 	return c, nil
 }
 
