@@ -90,13 +90,15 @@ func main() {
 | Contact Templates | yes | - | Read-only |
 | User Filters | yes | PUT + PATCH | Full CRUD |
 
-### Monitoring (real-time, read-only)
+### Monitoring (real-time)
 
 | Resource | Methods |
 |----------|---------|
 | Unified Resources | List, GetHost, GetService |
 | Monitoring Hosts | List, Get, StatusCounts, Services, Timeline |
 | Monitoring Services | List, StatusCounts |
+| Downtimes | List, Get, Cancel, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
+| Acknowledgements | List, Get, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
 | Notification Policies | GetForHost, GetForService |
 
 ### Downtime Management
