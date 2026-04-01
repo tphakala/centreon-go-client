@@ -47,6 +47,7 @@ type Client struct {
 	Operations         *OperationsService
 	Users              *UserService
 	ContactGroups      *ContactGroupService
+	ContactTemplates   *ContactTemplateService
 }
 
 // Option configures a Client.
@@ -89,6 +90,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.Operations = &OperationsService{client: c}
 	c.Users = &UserService{client: c}
 	c.ContactGroups = &ContactGroupService{client: c}
+	c.ContactTemplates = &ContactTemplateService{client: c}
 	return c, nil
 }
 
