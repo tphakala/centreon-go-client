@@ -152,6 +152,25 @@ func (c *Client) Token() string {
 	return c.token
 }
 
+type contextKey string
+
+const toolNameKey contextKey = "centreon.tool"
+
+// WithToolName returns a context annotated with a tool/caller name
+// that will be included in log output. This helps correlate API calls
+// to the higher-level operation that triggered them.
+func WithToolName(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, toolNameKey, name)
+}
+
+// toolName extracts the tool name from the context, or returns "" if not set.
+func toolName(ctx context.Context) string {
+	if v, ok := ctx.Value(toolNameKey).(string); ok {
+		return v
+	}
+	return ""
+}
+
 // buildURL constructs the full API URL for the given path.
 func (c *Client) buildURL(path string) string {
 	return fmt.Sprintf("%s/centreon/api/%s%s", c.baseURL, c.apiVersion, path)
@@ -187,12 +206,14 @@ func (c *Client) sendRequest(ctx context.Context, method, reqURL string, body an
 		req.Header.Set("X-AUTH-TOKEN", token)
 	}
 
+	start := time.Now()
 	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
 	if err != nil {
-		c.logError(ctx, "request failed", method, reqURL, err)
+		c.logError(ctx, "request failed", method, reqURL, err, duration)
 		return nil, err
 	}
-	c.logDebug(ctx, "request completed", method, reqURL, resp.StatusCode)
+	c.logDebug(ctx, "request completed", method, reqURL, resp.StatusCode, duration)
 	return resp, nil
 }
 
@@ -247,7 +268,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 
 	if resp.StatusCode >= httpStatusError {
 		apiErr := parseError(resp)
-		c.logError(ctx, "API error", method, fullURL, apiErr)
+		c.logError(ctx, "API error", method, fullURL, apiErr, 0)
 		return apiErr
 	}
 
@@ -265,22 +286,35 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 }
 
 // Logging helpers — no-ops when logger is nil.
+// Include tool name from context and request duration when available.
 
-func (c *Client) logDebug(_ context.Context, msg, method, reqURL string, status int) {
+func (c *Client) logDebug(ctx context.Context, msg, method, reqURL string, status int, duration time.Duration) {
 	if c.logger != nil {
-		c.logger.Debug(msg, "method", method, "url", reqURL, "status", status)
+		attrs := []any{"method", method, "url", reqURL, "status", status, "duration", duration}
+		if tool := toolName(ctx); tool != "" {
+			attrs = append(attrs, "tool", tool)
+		}
+		c.logger.Debug(msg, attrs...)
 	}
 }
 
-func (c *Client) logInfo(_ context.Context, msg string) {
+func (c *Client) logInfo(ctx context.Context, msg string) {
 	if c.logger != nil {
-		c.logger.Info(msg)
+		attrs := []any{}
+		if tool := toolName(ctx); tool != "" {
+			attrs = append(attrs, "tool", tool)
+		}
+		c.logger.Info(msg, attrs...)
 	}
 }
 
-func (c *Client) logError(_ context.Context, msg, method, reqURL string, err error) {
+func (c *Client) logError(ctx context.Context, msg, method, reqURL string, err error, duration time.Duration) {
 	if c.logger != nil {
-		c.logger.Error(msg, "method", method, "url", reqURL, "error", err)
+		attrs := []any{"method", method, "url", reqURL, "error", err, "duration", duration}
+		if tool := toolName(ctx); tool != "" {
+			attrs = append(attrs, "tool", tool)
+		}
+		c.logger.Error(msg, attrs...)
 	}
 }
 
