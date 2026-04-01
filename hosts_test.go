@@ -13,8 +13,8 @@ func TestHostService_List(t *testing.T) {
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, ListResponse[Host]{
 			Result: []Host{
-				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServerID: 1, IsActivated: true},
-				{ID: 2, Name: "host-02", Address: "10.0.0.2", MonitoringServerID: 1, IsActivated: true},
+				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
+				{ID: 2, Name: "host-02", Address: "10.0.0.2", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
 			},
 			Meta: Meta{Page: 1, Limit: 10, Total: 2},
 		})
@@ -26,6 +26,9 @@ func TestHostService_List(t *testing.T) {
 	}
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
+	}
+	if resp.Result[0].MonitoringServer.ID != 1 {
+		t.Errorf("Result[0].MonitoringServer.ID = %d, want 1", resp.Result[0].MonitoringServer.ID)
 	}
 	if resp.Result[0].Name != "host-01" {
 		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "host-01")
@@ -41,7 +44,7 @@ func TestHostService_List_WithSearch(t *testing.T) {
 		}
 		writeJSON(w, http.StatusOK, ListResponse[Host]{
 			Result: []Host{
-				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServerID: 1, IsActivated: true},
+				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
 			},
 			Meta: Meta{Page: 1, Limit: 10, Total: 1},
 		})
@@ -62,7 +65,7 @@ func TestHostService_GetByID_Found(t *testing.T) {
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, ListResponse[Host]{
 			Result: []Host{
-				{ID: 42, Name: "host-42", Address: "10.0.0.42", MonitoringServerID: 1, IsActivated: true},
+				{ID: 42, Name: "host-42", Address: "10.0.0.42", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
 			},
 			Meta: Meta{Page: 1, Limit: 10, Total: 1},
 		})
