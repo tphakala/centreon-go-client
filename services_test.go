@@ -219,8 +219,8 @@ func TestServiceService_Update_WithRelationshipFields(t *testing.T) {
 	tmplID := 200
 	err := c.Services.Update(t.Context(), 20, &UpdateServiceRequest{
 		ServiceTemplateID: &tmplID,
-		ServiceCategories: []int{9, 10},
-		Macros:            []Macro{{Name: "CRITICAL", Value: "95"}},
+		ServiceCategories: &[]int{9, 10},
+		Macros:            &[]Macro{{Name: "CRITICAL", Value: "95"}},
 	})
 	if err != nil {
 		t.Fatalf("Update: %v", err)

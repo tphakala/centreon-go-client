@@ -268,8 +268,8 @@ func TestHostService_Update_WithRelationshipFields(t *testing.T) {
 	community := "private"
 	err := c.Hosts.Update(t.Context(), 10, &UpdateHostRequest{
 		SNMPCommunity: &community,
-		Templates:     []int{100, 200},
-		Macros:        []Macro{{Name: "ENV", Value: "prod"}},
+		Templates:     &[]int{100, 200},
+		Macros:        &[]Macro{{Name: "ENV", Value: "prod"}},
 	})
 	if err != nil {
 		t.Fatalf("Update: %v", err)

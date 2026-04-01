@@ -61,22 +61,22 @@ type CreateServiceRequest struct {
 
 // UpdateServiceRequest is the request body for updating a service (PATCH).
 type UpdateServiceRequest struct {
-	Name                *string  `json:"name,omitempty"`
-	Alias               *string  `json:"alias,omitempty"`
-	CheckCommandID      *int     `json:"check_command_id,omitempty"`
-	CheckCommandArgs    []string `json:"check_command_args,omitempty"`
-	CheckTimeperiodID   *int     `json:"check_timeperiod_id,omitempty"`
-	MaxCheckAttempts    *int     `json:"max_check_attempts,omitempty"`
-	NormalCheckInterval *int     `json:"normal_check_interval,omitempty"`
-	RetryCheckInterval  *int     `json:"retry_check_interval,omitempty"`
-	ActiveChecksEnabled *bool    `json:"active_checks_enabled,omitempty"`
-	IsActivated         *bool    `json:"is_activated,omitempty"`
-	ServiceTemplateID   *int     `json:"service_template_id,omitempty"`
-	NotificationEnabled *int     `json:"notification_enabled,omitempty"`
-	SeverityID          *int     `json:"severity_id,omitempty"`
-	ServiceCategories   []int    `json:"service_categories,omitempty"`
-	ServiceGroups       []int    `json:"service_groups,omitempty"`
-	Macros              []Macro  `json:"macros,omitempty"`
+	Name                *string   `json:"name,omitempty"`
+	Alias               *string   `json:"alias,omitempty"`
+	CheckCommandID      *int      `json:"check_command_id,omitempty"`
+	CheckCommandArgs    *[]string `json:"check_command_args,omitempty"`
+	CheckTimeperiodID   *int      `json:"check_timeperiod_id,omitempty"`
+	MaxCheckAttempts    *int      `json:"max_check_attempts,omitempty"`
+	NormalCheckInterval *int      `json:"normal_check_interval,omitempty"`
+	RetryCheckInterval  *int      `json:"retry_check_interval,omitempty"`
+	ActiveChecksEnabled *bool     `json:"active_checks_enabled,omitempty"`
+	IsActivated         *bool     `json:"is_activated,omitempty"`
+	ServiceTemplateID   *int      `json:"service_template_id,omitempty"`
+	NotificationEnabled *int      `json:"notification_enabled,omitempty"`
+	SeverityID          *int      `json:"severity_id,omitempty"`
+	ServiceCategories   *[]int    `json:"service_categories,omitempty"`
+	ServiceGroups       *[]int    `json:"service_groups,omitempty"`
+	Macros              *[]Macro  `json:"macros,omitempty"`
 }
 
 // ServiceService provides service configuration operations.

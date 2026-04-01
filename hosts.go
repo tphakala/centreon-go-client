@@ -80,26 +80,26 @@ type CreateHostRequest struct {
 
 // UpdateHostRequest is the request body for updating a host (PATCH).
 type UpdateHostRequest struct {
-	Name                *string  `json:"name,omitempty"`
-	Alias               *string  `json:"alias,omitempty"`
-	Address             *string  `json:"address,omitempty"`
-	CheckCommandID      *int     `json:"check_command_id,omitempty"`
-	CheckCommandArgs    []string `json:"check_command_args,omitempty"`
-	CheckTimeperiodID   *int     `json:"check_timeperiod_id,omitempty"`
-	MaxCheckAttempts    *int     `json:"max_check_attempts,omitempty"`
-	NormalCheckInterval *int     `json:"normal_check_interval,omitempty"`
-	RetryCheckInterval  *int     `json:"retry_check_interval,omitempty"`
-	ActiveChecksEnabled *bool    `json:"active_checks_enabled,omitempty"`
-	IsActivated         *bool    `json:"is_activated,omitempty"`
-	SNMPCommunity       *string  `json:"snmp_community,omitempty"`
-	SNMPVersion         *string  `json:"snmp_version,omitempty"`
-	NotificationEnabled *int     `json:"notification_enabled,omitempty"`
-	TimezoneID          *int     `json:"timezone_id,omitempty"`
-	SeverityID          *int     `json:"severity_id,omitempty"`
-	Templates           []int    `json:"templates,omitempty"`
-	Groups              []int    `json:"groups,omitempty"`
-	Categories          []int    `json:"categories,omitempty"`
-	Macros              []Macro  `json:"macros,omitempty"`
+	Name                *string   `json:"name,omitempty"`
+	Alias               *string   `json:"alias,omitempty"`
+	Address             *string   `json:"address,omitempty"`
+	CheckCommandID      *int      `json:"check_command_id,omitempty"`
+	CheckCommandArgs    *[]string `json:"check_command_args,omitempty"`
+	CheckTimeperiodID   *int      `json:"check_timeperiod_id,omitempty"`
+	MaxCheckAttempts    *int      `json:"max_check_attempts,omitempty"`
+	NormalCheckInterval *int      `json:"normal_check_interval,omitempty"`
+	RetryCheckInterval  *int      `json:"retry_check_interval,omitempty"`
+	ActiveChecksEnabled *bool     `json:"active_checks_enabled,omitempty"`
+	IsActivated         *bool     `json:"is_activated,omitempty"`
+	SNMPCommunity       *string   `json:"snmp_community,omitempty"`
+	SNMPVersion         *string   `json:"snmp_version,omitempty"`
+	NotificationEnabled *int      `json:"notification_enabled,omitempty"`
+	TimezoneID          *int      `json:"timezone_id,omitempty"`
+	SeverityID          *int      `json:"severity_id,omitempty"`
+	Templates           *[]int    `json:"templates,omitempty"`
+	Groups              *[]int    `json:"groups,omitempty"`
+	Categories          *[]int    `json:"categories,omitempty"`
+	Macros              *[]Macro  `json:"macros,omitempty"`
 }
 
 // HostService provides host configuration operations.
