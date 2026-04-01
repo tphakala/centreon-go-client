@@ -74,12 +74,12 @@ func (s *AcknowledgementService) ListForService(ctx context.Context, hostID, ser
 }
 
 // CreateForHost acknowledges the given host.
-func (s *AcknowledgementService) CreateForHost(ctx context.Context, hostID int, req CreateAcknowledgementRequest) error {
+func (s *AcknowledgementService) CreateForHost(ctx context.Context, hostID int, req *CreateAcknowledgementRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/acknowledgements", hostID), req, nil)
 }
 
 // CreateForService acknowledges the given service on a host.
-func (s *AcknowledgementService) CreateForService(ctx context.Context, hostID, serviceID int, req CreateAcknowledgementRequest) error {
+func (s *AcknowledgementService) CreateForService(ctx context.Context, hostID, serviceID int, req *CreateAcknowledgementRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/acknowledgements", hostID, serviceID), req, nil)
 }
 

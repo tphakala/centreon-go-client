@@ -179,7 +179,7 @@ func TestAcknowledgementService_CreateForHost(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Acknowledgements.CreateForHost(t.Context(), 10, CreateAcknowledgementRequest{
+	err := c.Acknowledgements.CreateForHost(t.Context(), 10, &CreateAcknowledgementRequest{
 		Comment:             "Acknowledged by operator",
 		IsSticky:            true,
 		IsPersistentComment: true,
@@ -211,7 +211,7 @@ func TestAcknowledgementService_CreateForService(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Acknowledgements.CreateForService(t.Context(), 10, 5, CreateAcknowledgementRequest{
+	err := c.Acknowledgements.CreateForService(t.Context(), 10, 5, &CreateAcknowledgementRequest{
 		Comment:          "Service acknowledged",
 		IsNotifyContacts: true,
 	})
