@@ -213,6 +213,23 @@ if err != nil {
 }
 ```
 
+## Timeout & Logging
+
+```go
+// Custom timeout (default 30s)
+client, _ := centreon.NewClient(url,
+    centreon.WithTimeout(60 * time.Second),
+)
+
+// Enable structured logging
+client, _ := centreon.NewClient(url,
+    centreon.WithLogger(slog.Default()),
+)
+// Debug: logs every request (method, URL, status)
+// Info:  logs token re-authentication
+// Error: logs API errors and request failures
+```
+
 ## API Version
 
 The client defaults to `latest`. Pin to a specific version to avoid breaking changes:

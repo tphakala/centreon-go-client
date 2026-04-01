@@ -94,6 +94,10 @@ linters:
       - linters:
           - goconst
         path: "_test\\.go"
+      - linters:
+          - gocritic
+        path: "example_test\\.go"
+        text: "ruleguard"
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
