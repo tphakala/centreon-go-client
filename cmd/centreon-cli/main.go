@@ -184,8 +184,12 @@ func cmdServices(ctx context.Context, client *centreon.Client) {
 	}
 	fmt.Printf("Services (%d total, showing %d):\n", resp.Meta.Total, len(resp.Result))
 	for _, s := range resp.Result {
-		fmt.Printf("  %5d  host=%d  %-30s  active=%v\n",
-			s.ID, s.HostID, s.Name, s.IsActivated)
+		hostName := ""
+		if len(s.Hosts) > 0 {
+			hostName = s.Hosts[0].Name
+		}
+		fmt.Printf("  %5d  host=%-20s  %-30s  active=%v\n",
+			s.ID, hostName, s.Name, s.IsActivated)
 	}
 }
 
@@ -304,7 +308,11 @@ func cmdSearch(ctx context.Context, client *centreon.Client, resource, field, pa
 		}
 		fmt.Printf("Found %d services (showing %d):\n", resp.Meta.Total, len(resp.Result))
 		for _, s := range resp.Result {
-			fmt.Printf("  %5d  host=%d  %s\n", s.ID, s.HostID, s.Name)
+			hostName := ""
+			if len(s.Hosts) > 0 {
+				hostName = s.Hosts[0].Name
+			}
+			fmt.Printf("  %5d  host=%-20s  %s\n", s.ID, hostName, s.Name)
 		}
 	default:
 		log.Fatalf("unsupported resource for search: %s (use: hosts, services)", resource)
