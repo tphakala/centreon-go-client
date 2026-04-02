@@ -34,8 +34,8 @@ type CreateDowntimeRequest struct {
 	StartTime    time.Time `json:"start_time"`
 	EndTime      time.Time `json:"end_time"`
 	IsFixed      bool      `json:"is_fixed"`
-	Duration     int       `json:"duration,omitzero"`
-	WithServices bool      `json:"with_services,omitzero"`
+	Duration     int       `json:"duration"`
+	WithServices bool      `json:"with_services"`
 }
 
 // DowntimeService provides access to the downtime endpoints.
