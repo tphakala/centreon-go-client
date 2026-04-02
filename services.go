@@ -45,15 +45,41 @@ type CreateServiceRequest struct {
 	NormalCheckInterval int      `json:"normal_check_interval,omitzero"`
 	RetryCheckInterval  int      `json:"retry_check_interval,omitzero"`
 
+	// Check toggles (0=Disabled, 1=Enabled, 2=Inherit)
+	ActiveCheckEnabled  int `json:"active_check_enabled,omitzero"`
+	PassiveCheckEnabled int `json:"passive_check_enabled,omitzero"`
+	VolatilityEnabled   int `json:"volatility_enabled,omitzero"`
+
+	// Freshness
+	FreshnessChecked   int `json:"freshness_checked,omitzero"`
+	FreshnessThreshold int `json:"freshness_threshold,omitzero"`
+
+	// Flap detection
+	FlapDetectionEnabled int `json:"flap_detection_enabled,omitzero"`
+	LowFlapThreshold     int `json:"low_flap_threshold,omitzero"`
+	HighFlapThreshold    int `json:"high_flap_threshold,omitzero"`
+
 	// Notifications
-	NotificationEnabled      int `json:"notification_enabled,omitzero"`
-	NotificationInterval     int `json:"notification_interval,omitzero"`
-	NotificationTimeperiodID int `json:"notification_timeperiod_id,omitzero"`
+	NotificationEnabled       int `json:"notification_enabled,omitzero"`
+	NotificationInterval      int `json:"notification_interval,omitzero"`
+	NotificationTimeperiodID  int `json:"notification_timeperiod_id,omitzero"`
+	FirstNotificationDelay    int `json:"first_notification_delay,omitzero"`
+	RecoveryNotificationDelay int `json:"recovery_notification_delay,omitzero"`
+
+	// Inheritance
+	IsContactAdditiveInheritance      bool `json:"is_contact_additive_inheritance,omitzero"`
+	IsContactGroupAdditiveInheritance bool `json:"is_contact_group_additive_inheritance,omitzero"`
 
 	// References
 	SeverityID      int `json:"severity_id,omitzero"`
 	GraphTemplateID int `json:"graph_template_id,omitzero"`
 	IconID          int `json:"icon_id,omitzero"`
+
+	// Descriptive
+	Note            string `json:"note,omitzero"`
+	NoteURL         string `json:"note_url,omitzero"`
+	ActionURL       string `json:"action_url,omitzero"`
+	IconAlternative string `json:"icon_alternative,omitzero"`
 
 	// Relationships
 	ServiceCategories []int   `json:"service_categories,omitzero"`
@@ -63,23 +89,42 @@ type CreateServiceRequest struct {
 
 // UpdateServiceRequest is the request body for updating a service (PATCH).
 type UpdateServiceRequest struct {
-	Name                *string   `json:"name,omitempty"`
-	Alias               *string   `json:"alias,omitempty"`
-	CheckCommandID      *int      `json:"check_command_id,omitempty"`
-	CheckCommandArgs    *[]string `json:"check_command_args,omitempty"`
-	CheckTimeperiodID   *int      `json:"check_timeperiod_id,omitempty"`
-	MaxCheckAttempts    *int      `json:"max_check_attempts,omitempty"`
-	NormalCheckInterval *int      `json:"normal_check_interval,omitempty"`
-	RetryCheckInterval  *int      `json:"retry_check_interval,omitempty"`
-	ActiveCheckEnabled  *int      `json:"active_check_enabled,omitempty"`
-	PassiveCheckEnabled *int      `json:"passive_check_enabled,omitempty"`
-	IsActivated         *bool     `json:"is_activated,omitempty"`
-	ServiceTemplateID   *int      `json:"service_template_id,omitempty"`
-	NotificationEnabled *int      `json:"notification_enabled,omitempty"`
-	SeverityID          *int      `json:"severity_id,omitempty"`
-	ServiceCategories   *[]int    `json:"service_categories,omitempty"`
-	ServiceGroups       *[]int    `json:"service_groups,omitempty"`
-	Macros              *[]Macro  `json:"macros,omitempty"`
+	Name                              *string   `json:"name,omitempty"`
+	Alias                             *string   `json:"alias,omitempty"`
+	Comment                           *string   `json:"comment,omitempty"`
+	IsActivated                       *bool     `json:"is_activated,omitempty"`
+	ServiceTemplateID                 *int      `json:"service_template_id,omitempty"`
+	CheckCommandID                    *int      `json:"check_command_id,omitempty"`
+	CheckCommandArgs                  *[]string `json:"check_command_args,omitempty"`
+	CheckTimeperiodID                 *int      `json:"check_timeperiod_id,omitempty"`
+	MaxCheckAttempts                  *int      `json:"max_check_attempts,omitempty"`
+	NormalCheckInterval               *int      `json:"normal_check_interval,omitempty"`
+	RetryCheckInterval                *int      `json:"retry_check_interval,omitempty"`
+	ActiveCheckEnabled                *int      `json:"active_check_enabled,omitempty"`
+	PassiveCheckEnabled               *int      `json:"passive_check_enabled,omitempty"`
+	VolatilityEnabled                 *int      `json:"volatility_enabled,omitempty"`
+	FreshnessChecked                  *int      `json:"freshness_checked,omitempty"`
+	FreshnessThreshold                *int      `json:"freshness_threshold,omitempty"`
+	FlapDetectionEnabled              *int      `json:"flap_detection_enabled,omitempty"`
+	LowFlapThreshold                  *int      `json:"low_flap_threshold,omitempty"`
+	HighFlapThreshold                 *int      `json:"high_flap_threshold,omitempty"`
+	NotificationEnabled               *int      `json:"notification_enabled,omitempty"`
+	NotificationInterval              *int      `json:"notification_interval,omitempty"`
+	NotificationTimeperiodID          *int      `json:"notification_timeperiod_id,omitempty"`
+	FirstNotificationDelay            *int      `json:"first_notification_delay,omitempty"`
+	RecoveryNotificationDelay         *int      `json:"recovery_notification_delay,omitempty"`
+	IsContactAdditiveInheritance      *bool     `json:"is_contact_additive_inheritance,omitempty"`
+	IsContactGroupAdditiveInheritance *bool     `json:"is_contact_group_additive_inheritance,omitempty"`
+	SeverityID                        *int      `json:"severity_id,omitempty"`
+	GraphTemplateID                   *int      `json:"graph_template_id,omitempty"`
+	IconID                            *int      `json:"icon_id,omitempty"`
+	Note                              *string   `json:"note,omitempty"`
+	NoteURL                           *string   `json:"note_url,omitempty"`
+	ActionURL                         *string   `json:"action_url,omitempty"`
+	IconAlternative                   *string   `json:"icon_alternative,omitempty"`
+	ServiceCategories                 *[]int    `json:"service_categories,omitempty"`
+	ServiceGroups                     *[]int    `json:"service_groups,omitempty"`
+	Macros                            *[]Macro  `json:"macros,omitempty"`
 }
 
 // ServiceService provides service configuration operations.

@@ -65,16 +65,43 @@ type CreateHostRequest struct {
 	SNMPCommunity string `json:"snmp_community,omitzero"`
 	SNMPVersion   string `json:"snmp_version,omitzero"`
 
+	// Check toggles (0=Disabled, 1=Enabled, 2=Inherit)
+	ActiveCheckEnabled  int `json:"active_check_enabled,omitzero"`
+	PassiveCheckEnabled int `json:"passive_check_enabled,omitzero"`
+
+	// Freshness
+	FreshnessChecked   int `json:"freshness_checked,omitzero"`
+	FreshnessThreshold int `json:"freshness_threshold,omitzero"`
+
+	// Flap detection
+	FlapDetectionEnabled int `json:"flap_detection_enabled,omitzero"`
+	LowFlapThreshold     int `json:"low_flap_threshold,omitzero"`
+	HighFlapThreshold    int `json:"high_flap_threshold,omitzero"`
+
+	// Event handler
+	EventHandlerEnabled     int    `json:"event_handler_enabled,omitzero"`
+	EventHandlerCommandID   int    `json:"event_handler_command_id,omitzero"`
+	EventHandlerCommandArgs string `json:"event_handler_command_args,omitzero"`
+
 	// Notifications
-	NotificationEnabled      int `json:"notification_enabled,omitzero"`
-	NotificationOptions      int `json:"notification_options,omitzero"`
-	NotificationInterval     int `json:"notification_interval,omitzero"`
-	NotificationTimeperiodID int `json:"notification_timeperiod_id,omitzero"`
+	NotificationEnabled       int `json:"notification_enabled,omitzero"`
+	NotificationOptions       int `json:"notification_options,omitzero"`
+	NotificationInterval      int `json:"notification_interval,omitzero"`
+	NotificationTimeperiodID  int `json:"notification_timeperiod_id,omitzero"`
+	FirstNotificationDelay    int `json:"first_notification_delay,omitzero"`
+	RecoveryNotificationDelay int `json:"recovery_notification_delay,omitzero"`
+	AcknowledgementTimeout    int `json:"acknowledgement_timeout,omitzero"`
 
 	// References
 	TimezoneID int `json:"timezone_id,omitzero"`
 	SeverityID int `json:"severity_id,omitzero"`
 	IconID     int `json:"icon_id,omitzero"`
+
+	// Descriptive
+	Note            string `json:"note,omitzero"`
+	NoteURL         string `json:"note_url,omitzero"`
+	ActionURL       string `json:"action_url,omitzero"`
+	IconAlternative string `json:"icon_alternative,omitzero"`
 
 	// Relationships
 	Templates  []int   `json:"templates,omitzero"`
@@ -85,27 +112,47 @@ type CreateHostRequest struct {
 
 // UpdateHostRequest is the request body for updating a host (PATCH).
 type UpdateHostRequest struct {
-	Name                *string   `json:"name,omitempty"`
-	Alias               *string   `json:"alias,omitempty"`
-	Address             *string   `json:"address,omitempty"`
-	CheckCommandID      *int      `json:"check_command_id,omitempty"`
-	CheckCommandArgs    *[]string `json:"check_command_args,omitempty"`
-	CheckTimeperiodID   *int      `json:"check_timeperiod_id,omitempty"`
-	MaxCheckAttempts    *int      `json:"max_check_attempts,omitempty"`
-	NormalCheckInterval *int      `json:"normal_check_interval,omitempty"`
-	RetryCheckInterval  *int      `json:"retry_check_interval,omitempty"`
-	ActiveCheckEnabled  *int      `json:"active_check_enabled,omitempty"`
-	PassiveCheckEnabled *int      `json:"passive_check_enabled,omitempty"`
-	IsActivated         *bool     `json:"is_activated,omitempty"`
-	SNMPCommunity       *string   `json:"snmp_community,omitempty"`
-	SNMPVersion         *string   `json:"snmp_version,omitempty"`
-	NotificationEnabled *int      `json:"notification_enabled,omitempty"`
-	TimezoneID          *int      `json:"timezone_id,omitempty"`
-	SeverityID          *int      `json:"severity_id,omitempty"`
-	Templates           *[]int    `json:"templates,omitempty"`
-	Groups              *[]int    `json:"groups,omitempty"`
-	Categories          *[]int    `json:"categories,omitempty"`
-	Macros              *[]Macro  `json:"macros,omitempty"`
+	Name                      *string   `json:"name,omitempty"`
+	Alias                     *string   `json:"alias,omitempty"`
+	Address                   *string   `json:"address,omitempty"`
+	Comment                   *string   `json:"comment,omitempty"`
+	GeoCoords                 *string   `json:"geo_coords,omitempty"`
+	IsActivated               *bool     `json:"is_activated,omitempty"`
+	CheckCommandID            *int      `json:"check_command_id,omitempty"`
+	CheckCommandArgs          *[]string `json:"check_command_args,omitempty"`
+	CheckTimeperiodID         *int      `json:"check_timeperiod_id,omitempty"`
+	MaxCheckAttempts          *int      `json:"max_check_attempts,omitempty"`
+	NormalCheckInterval       *int      `json:"normal_check_interval,omitempty"`
+	RetryCheckInterval        *int      `json:"retry_check_interval,omitempty"`
+	ActiveCheckEnabled        *int      `json:"active_check_enabled,omitempty"`
+	PassiveCheckEnabled       *int      `json:"passive_check_enabled,omitempty"`
+	FreshnessChecked          *int      `json:"freshness_checked,omitempty"`
+	FreshnessThreshold        *int      `json:"freshness_threshold,omitempty"`
+	FlapDetectionEnabled      *int      `json:"flap_detection_enabled,omitempty"`
+	LowFlapThreshold          *int      `json:"low_flap_threshold,omitempty"`
+	HighFlapThreshold         *int      `json:"high_flap_threshold,omitempty"`
+	EventHandlerEnabled       *int      `json:"event_handler_enabled,omitempty"`
+	EventHandlerCommandID     *int      `json:"event_handler_command_id,omitempty"`
+	SNMPCommunity             *string   `json:"snmp_community,omitempty"`
+	SNMPVersion               *string   `json:"snmp_version,omitempty"`
+	NotificationEnabled       *int      `json:"notification_enabled,omitempty"`
+	NotificationOptions       *int      `json:"notification_options,omitempty"`
+	NotificationInterval      *int      `json:"notification_interval,omitempty"`
+	NotificationTimeperiodID  *int      `json:"notification_timeperiod_id,omitempty"`
+	FirstNotificationDelay    *int      `json:"first_notification_delay,omitempty"`
+	RecoveryNotificationDelay *int      `json:"recovery_notification_delay,omitempty"`
+	AcknowledgementTimeout    *int      `json:"acknowledgement_timeout,omitempty"`
+	TimezoneID                *int      `json:"timezone_id,omitempty"`
+	SeverityID                *int      `json:"severity_id,omitempty"`
+	IconID                    *int      `json:"icon_id,omitempty"`
+	Note                      *string   `json:"note,omitempty"`
+	NoteURL                   *string   `json:"note_url,omitempty"`
+	ActionURL                 *string   `json:"action_url,omitempty"`
+	IconAlternative           *string   `json:"icon_alternative,omitempty"`
+	Templates                 *[]int    `json:"templates,omitempty"`
+	Groups                    *[]int    `json:"groups,omitempty"`
+	Categories                *[]int    `json:"categories,omitempty"`
+	Macros                    *[]Macro  `json:"macros,omitempty"`
 }
 
 // HostService provides host configuration operations.

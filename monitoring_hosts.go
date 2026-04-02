@@ -24,6 +24,8 @@ type MonitoringHost struct {
 	LastStateChange  string  `json:"last_state_change,omitzero"`
 	ExecutionTime    float64 `json:"execution_time"`
 	DowntimeDepth    int     `json:"scheduled_downtime_depth"`
+	IconImage        string  `json:"icon_image,omitzero"`
+	IconImageAlt     string  `json:"icon_image_alt,omitzero"`
 }
 
 // StatusValue holds a count with a total subfield, as returned by the Centreon API.
