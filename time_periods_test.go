@@ -10,12 +10,24 @@ func TestTimePeriodService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/time-periods", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[TimePeriod]{
-			Result: []TimePeriod{
-				{ID: 1, Name: "24x7", Alias: "Always"},
-				{ID: 2, Name: "workhours", Alias: "Work Hours"},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{
+					"id": 1, "name": "24x7", "alias": "Always",
+					"days":       []any{},
+					"templates":  []any{},
+					"exceptions": []any{},
+					"in_period":  true,
+				},
+				{
+					"id": 2, "name": "workhours", "alias": "Work Hours",
+					"days":       []any{},
+					"templates":  []any{},
+					"exceptions": []any{},
+					"in_period":  false,
+				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -32,24 +44,31 @@ func TestTimePeriodService_List(t *testing.T) {
 	if resp.Result[1].Name != "workhours" {
 		t.Errorf("Result[1].Name = %q, want %q", resp.Result[1].Name, "workhours")
 	}
+	if resp.Result[0].InPeriod != true {
+		t.Errorf("Result[0].InPeriod = %v, want true", resp.Result[0].InPeriod)
+	}
 }
 
 func TestTimePeriodService_Get(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/time-periods/1", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, TimePeriod{
-			ID:    1,
-			Name:  "24x7",
-			Alias: "Always",
-			Days: []TimePeriodDay{
-				{
-					Day: "monday",
-					TimeRanges: []TimeRange{
-						{Start: "00:00", End: "24:00"},
-					},
-				},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":    1,
+			"name":  "24x7",
+			"alias": "24_Hours_A_Day,_7_Days_A_Week",
+			"days": []map[string]any{
+				{"day": 1, "time_range": "00:00-24:00"},
+				{"day": 2, "time_range": "00:00-24:00"},
+				{"day": 3, "time_range": "00:00-24:00"},
+				{"day": 4, "time_range": "00:00-24:00"},
+				{"day": 5, "time_range": "00:00-24:00"},
+				{"day": 6, "time_range": "00:00-24:00"},
+				{"day": 7, "time_range": "00:00-24:00"},
 			},
+			"templates":  []any{},
+			"exceptions": []any{},
+			"in_period":  true,
 		})
 	})
 
@@ -63,17 +82,20 @@ func TestTimePeriodService_Get(t *testing.T) {
 	if tp.Name != "24x7" {
 		t.Errorf("Name = %q, want %q", tp.Name, "24x7")
 	}
-	if len(tp.Days) != 1 {
-		t.Fatalf("len(Days) = %d, want 1", len(tp.Days))
+	if len(tp.Days) != 7 {
+		t.Fatalf("len(Days) = %d, want 7", len(tp.Days))
 	}
-	if tp.Days[0].Day != "monday" {
-		t.Errorf("Days[0].Day = %q, want %q", tp.Days[0].Day, "monday")
+	if tp.Days[0].Day != 1 {
+		t.Errorf("Days[0].Day = %d, want 1", tp.Days[0].Day)
 	}
-	if len(tp.Days[0].TimeRanges) != 1 {
-		t.Fatalf("len(Days[0].TimeRanges) = %d, want 1", len(tp.Days[0].TimeRanges))
+	if tp.Days[0].TimeRange != "00:00-24:00" {
+		t.Errorf("Days[0].TimeRange = %q, want %q", tp.Days[0].TimeRange, "00:00-24:00")
 	}
-	if tp.Days[0].TimeRanges[0].Start != "00:00" {
-		t.Errorf("TimeRanges[0].Start = %q, want %q", tp.Days[0].TimeRanges[0].Start, "00:00")
+	if tp.Days[6].Day != 7 {
+		t.Errorf("Days[6].Day = %d, want 7", tp.Days[6].Day)
+	}
+	if !tp.InPeriod {
+		t.Errorf("InPeriod = false, want true")
 	}
 }
 
@@ -94,17 +116,11 @@ func TestTimePeriodService_Create(t *testing.T) {
 		if len(req.Days) != 1 {
 			t.Fatalf("len(Days) = %d, want 1", len(req.Days))
 		}
-		if req.Days[0].Day != "monday" {
-			t.Errorf("Days[0].Day = %q, want %q", req.Days[0].Day, "monday")
+		if req.Days[0].Day != 1 {
+			t.Errorf("Days[0].Day = %d, want 1", req.Days[0].Day)
 		}
-		if len(req.Days[0].TimeRanges) != 1 {
-			t.Fatalf("len(Days[0].TimeRanges) = %d, want 1", len(req.Days[0].TimeRanges))
-		}
-		if req.Days[0].TimeRanges[0].Start != "08:00" {
-			t.Errorf("TimeRanges[0].Start = %q, want %q", req.Days[0].TimeRanges[0].Start, "08:00")
-		}
-		if req.Days[0].TimeRanges[0].End != "18:00" {
-			t.Errorf("TimeRanges[0].End = %q, want %q", req.Days[0].TimeRanges[0].End, "18:00")
+		if req.Days[0].TimeRange != "08:00-18:00" {
+			t.Errorf("Days[0].TimeRange = %q, want %q", req.Days[0].TimeRange, "08:00-18:00")
 		}
 		writeJSON(w, http.StatusCreated, map[string]int{"id": 5})
 	})
@@ -113,12 +129,7 @@ func TestTimePeriodService_Create(t *testing.T) {
 		Name:  "business-hours",
 		Alias: "Business Hours",
 		Days: []TimePeriodDay{
-			{
-				Day: "monday",
-				TimeRanges: []TimeRange{
-					{Start: "08:00", End: "18:00"},
-				},
-			},
+			{Day: 1, TimeRange: "08:00-18:00"},
 		},
 	})
 	if err != nil {

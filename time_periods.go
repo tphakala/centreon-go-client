@@ -8,22 +8,21 @@ import (
 
 // TimePeriod represents a Centreon time period configuration resource.
 type TimePeriod struct {
-	ID    int             `json:"id"`
-	Name  string          `json:"name"`
-	Alias string          `json:"alias"`
-	Days  []TimePeriodDay `json:"days,omitzero"`
+	ID         int             `json:"id"`
+	Name       string          `json:"name"`
+	Alias      string          `json:"alias"`
+	Days       []TimePeriodDay `json:"days,omitzero"`
+	Templates  []NamedRef      `json:"templates,omitzero"`
+	Exceptions []any           `json:"exceptions,omitzero"`
+	InPeriod   bool            `json:"in_period"`
 }
 
 // TimePeriodDay represents a day definition within a time period.
+// Day is an integer where 1=Monday through 7=Sunday.
+// TimeRange is a string like "00:00-24:00".
 type TimePeriodDay struct {
-	Day        string      `json:"day"`
-	TimeRanges []TimeRange `json:"time_ranges"`
-}
-
-// TimeRange represents a start/end time range.
-type TimeRange struct {
-	Start string `json:"start"`
-	End   string `json:"end"`
+	Day       int    `json:"day"`
+	TimeRange string `json:"time_range"`
 }
 
 // CreateTimePeriodRequest is the request body for creating a time period.
