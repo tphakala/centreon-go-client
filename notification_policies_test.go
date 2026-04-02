@@ -9,13 +9,13 @@ func TestNotificationPolicyService_GetForHost(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts/10/notification-policy", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, NotificationPolicy{
-			IsNotificationEnabled: true,
-			Users: []User{
-				{ID: 1, Name: "admin", IsAdmin: true, IsActivated: true},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"is_notification_enabled": true,
+			"contacts": []map[string]any{
+				{"id": 1, "name": "admin", "is_admin": true, "is_activated": true},
 			},
-			ContactGroups: []ContactGroup{
-				{ID: 2, Name: "admins", IsActivated: true},
+			"contact_groups": []map[string]any{
+				{"id": 2, "name": "admins", "is_activated": true},
 			},
 		})
 	})
@@ -27,11 +27,11 @@ func TestNotificationPolicyService_GetForHost(t *testing.T) {
 	if !np.IsNotificationEnabled {
 		t.Error("IsNotificationEnabled = false, want true")
 	}
-	if len(np.Users) != 1 {
-		t.Fatalf("len(Users) = %d, want 1", len(np.Users))
+	if len(np.Contacts) != 1 {
+		t.Fatalf("len(Contacts) = %d, want 1", len(np.Contacts))
 	}
-	if np.Users[0].Name != "admin" {
-		t.Errorf("Users[0].Name = %q, want %q", np.Users[0].Name, "admin")
+	if np.Contacts[0].Name != "admin" {
+		t.Errorf("Contacts[0].Name = %q, want %q", np.Contacts[0].Name, "admin")
 	}
 	if len(np.ContactGroups) != 1 {
 		t.Fatalf("len(ContactGroups) = %d, want 1", len(np.ContactGroups))
@@ -45,10 +45,10 @@ func TestNotificationPolicyService_GetForService(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts/10/services/20/notification-policy", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, NotificationPolicy{
-			IsNotificationEnabled: false,
-			Users:                 []User{},
-			ContactGroups:         []ContactGroup{},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"is_notification_enabled": false,
+			"contacts":                []map[string]any{},
+			"contact_groups":          []map[string]any{},
 		})
 	})
 
@@ -59,8 +59,8 @@ func TestNotificationPolicyService_GetForService(t *testing.T) {
 	if np.IsNotificationEnabled {
 		t.Error("IsNotificationEnabled = true, want false")
 	}
-	if len(np.Users) != 0 {
-		t.Errorf("len(Users) = %d, want 0", len(np.Users))
+	if len(np.Contacts) != 0 {
+		t.Errorf("len(Contacts) = %d, want 0", len(np.Contacts))
 	}
 	if len(np.ContactGroups) != 0 {
 		t.Errorf("len(ContactGroups) = %d, want 0", len(np.ContactGroups))

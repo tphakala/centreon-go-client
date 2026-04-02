@@ -11,7 +11,7 @@ type MonitoringServer struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	Address     string `json:"address,omitzero"`
-	IsActivated bool   `json:"is_activated"`
+	IsActivated bool   `json:"is_activate"`
 	IsDefault   bool   `json:"is_default"`
 }
 

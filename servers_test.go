@@ -9,12 +9,12 @@ func TestMonitoringServerService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/monitoring-servers", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[MonitoringServer]{
-			Result: []MonitoringServer{
-				{ID: 1, Name: "Central", Address: "192.168.1.1", IsActivated: true, IsDefault: true},
-				{ID: 2, Name: "Poller", Address: "192.168.1.2", IsActivated: true, IsDefault: false},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "name": "Central", "address": "192.168.1.1", "is_activate": true, "is_default": true},
+				{"id": 2, "name": "Poller", "address": "192.168.1.2", "is_activate": true, "is_default": false},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -25,8 +25,12 @@ func TestMonitoringServerService_List(t *testing.T) {
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
 	}
-	if resp.Result[0].Name != "Central" {
-		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "Central")
+	s := resp.Result[0]
+	if s.Name != "Central" {
+		t.Errorf("Result[0].Name = %q, want %q", s.Name, "Central")
+	}
+	if !s.IsActivated {
+		t.Error("Result[0].IsActivated = false, want true")
 	}
 	if resp.Result[1].Name != "Poller" {
 		t.Errorf("Result[1].Name = %q, want %q", resp.Result[1].Name, "Poller")
