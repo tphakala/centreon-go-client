@@ -31,7 +31,7 @@ type UserService struct {
 // List returns a paginated list of users.
 func (s *UserService) List(ctx context.Context, opts ...ListOption) (*ListResponse[User], error) {
 	var resp ListResponse[User]
-	err := s.client.list(ctx, "/users", opts, &resp)
+	err := s.client.list(ctx, "/configuration/users", opts, &resp)
 	return &resp, err
 }
 
@@ -42,5 +42,5 @@ func (s *UserService) All(ctx context.Context, opts ...ListOption) iter.Seq2[*Us
 
 // Update updates an existing user using PATCH.
 func (s *UserService) Update(ctx context.Context, id int, req UpdateUserRequest) error {
-	return s.client.patch(ctx, fmt.Sprintf("/users/%d", id), req)
+	return s.client.patch(ctx, fmt.Sprintf("/configuration/users/%d", id), req)
 }

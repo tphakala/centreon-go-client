@@ -9,7 +9,7 @@ import (
 func TestUserService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("GET /centreon/api/latest/users", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /centreon/api/latest/configuration/users", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"result": []map[string]any{
 				{"id": 1, "name": "admin", "alias": "Administrator", "email": "admin@example.com", "is_admin": true},
@@ -43,7 +43,7 @@ func TestUserService_List(t *testing.T) {
 func TestUserService_Update(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("PATCH /centreon/api/latest/users/5", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PATCH /centreon/api/latest/configuration/users/5", func(w http.ResponseWriter, r *http.Request) {
 		var req UpdateUserRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("decode body: %v", err)

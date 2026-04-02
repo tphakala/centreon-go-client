@@ -8,7 +8,7 @@ import (
 func TestContactGroupService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("GET /centreon/api/latest/users/contact-groups", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /centreon/api/latest/configuration/users/contact-groups", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"result": []map[string]any{
 				{"id": 1, "name": "admins", "alias": "Administrators", "type": "local", "is_activated": true},

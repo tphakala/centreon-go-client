@@ -167,7 +167,7 @@ func TestAcknowledgementService_CreateForHost(t *testing.T) {
 	var called bool
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/acknowledgements", func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		var req CreateAcknowledgementRequest
+		var req CreateHostAcknowledgementRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("decode body: %v", err)
 		}
@@ -183,7 +183,7 @@ func TestAcknowledgementService_CreateForHost(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Acknowledgements.CreateForHost(t.Context(), 10, &CreateAcknowledgementRequest{
+	err := c.Acknowledgements.CreateForHost(t.Context(), 10, &CreateHostAcknowledgementRequest{
 		Comment:             "Acknowledged by operator",
 		IsSticky:            true,
 		IsPersistentComment: true,
@@ -202,7 +202,7 @@ func TestAcknowledgementService_CreateForService(t *testing.T) {
 	var called bool
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/services/5/acknowledgements", func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		var req CreateAcknowledgementRequest
+		var req CreateServiceAcknowledgementRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("decode body: %v", err)
 		}
@@ -215,7 +215,7 @@ func TestAcknowledgementService_CreateForService(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Acknowledgements.CreateForService(t.Context(), 10, 5, &CreateAcknowledgementRequest{
+	err := c.Acknowledgements.CreateForService(t.Context(), 10, 5, &CreateServiceAcknowledgementRequest{
 		Comment:          "Service acknowledged",
 		IsNotifyContacts: true,
 	})
@@ -241,7 +241,7 @@ func TestAcknowledgementService_CreateForHost_WithServices(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Acknowledgements.CreateForHost(t.Context(), 10, &CreateAcknowledgementRequest{
+	err := c.Acknowledgements.CreateForHost(t.Context(), 10, &CreateHostAcknowledgementRequest{
 		Comment:      "test ack",
 		WithServices: true,
 	})

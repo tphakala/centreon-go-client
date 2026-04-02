@@ -7,31 +7,65 @@ import (
 	"time"
 )
 
+// decodeBody decodes a JSON request body into a map and returns it.
+func decodeBody(t *testing.T, r *http.Request) map[string]any {
+	t.Helper()
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	return body
+}
+
+// resourceAt extracts resource at index i from the body's "resources" array.
+func resourceAt(t *testing.T, body map[string]any, i int) map[string]any {
+	t.Helper()
+	resources, ok := body["resources"].([]any)
+	if !ok || len(resources) <= i {
+		t.Fatalf("resources = %v, want array with at least %d elements", body["resources"], i+1)
+	}
+	res, ok := resources[i].(map[string]any)
+	if !ok {
+		t.Fatalf("resources[%d] is not an object", i)
+	}
+	return res
+}
+
+// requireNullParent checks that a resource has "parent": null (present but nil).
+func requireNullParent(t *testing.T, res map[string]any, label string) {
+	t.Helper()
+	if _, hasParent := res["parent"]; !hasParent {
+		t.Errorf("%s.parent is missing, want explicit null", label)
+	}
+	if res["parent"] != nil {
+		t.Errorf("%s.parent = %v, want null", label, res["parent"])
+	}
+}
+
 func TestOperationsService_Acknowledge(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	var called bool
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/acknowledge", func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		var req AcknowledgeRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+		body := decodeBody(t, r)
+		res := resourceAt(t, body, 0)
+		if res["type"] != "host" {
+			t.Errorf("resources[0].type = %v, want host", res["type"])
 		}
-		if len(req.Resources) != 1 {
-			t.Fatalf("len(Resources) = %d, want 1", len(req.Resources))
+		requireNullParent(t, res, "resources[0]")
+
+		ack, ok := body["acknowledgement"].(map[string]any)
+		if !ok {
+			t.Fatalf("acknowledgement wrapper missing, got body: %v", body)
 		}
-		if req.Resources[0].Type != "host" {
-			t.Errorf("Resources[0].Type = %q, want %q", req.Resources[0].Type, "host")
+		if ack["comment"] != "Acknowledged by operator" {
+			t.Errorf("acknowledgement.comment = %v, want %q", ack["comment"], "Acknowledged by operator")
 		}
-		if req.Resources[0].ID != 42 {
-			t.Errorf("Resources[0].ID = %d, want 42", req.Resources[0].ID)
+		if ack["is_sticky"] != true {
+			t.Error("acknowledgement.is_sticky should be true")
 		}
-		if req.Comment != "Acknowledged by operator" {
-			t.Errorf("Comment = %q, want %q", req.Comment, "Acknowledged by operator")
-		}
-		if !req.IsSticky {
-			t.Error("IsSticky should be true")
-		}
+
 		w.WriteHeader(http.StatusNoContent)
 	})
 
@@ -59,19 +93,23 @@ func TestOperationsService_Downtime(t *testing.T) {
 	var called bool
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/downtime", func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		var req DowntimeRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+		body := decodeBody(t, r)
+		for i := range 2 {
+			res := resourceAt(t, body, i)
+			requireNullParent(t, res, "resources[0]")
 		}
-		if len(req.Resources) != 2 {
-			t.Errorf("len(Resources) = %d, want 2", len(req.Resources))
+
+		dt, ok := body["downtime"].(map[string]any)
+		if !ok {
+			t.Fatalf("downtime wrapper missing, got body: %v", body)
 		}
-		if req.Comment != "Maintenance window" {
-			t.Errorf("Comment = %q, want %q", req.Comment, "Maintenance window")
+		if dt["comment"] != "Maintenance window" {
+			t.Errorf("downtime.comment = %v, want %q", dt["comment"], "Maintenance window")
 		}
-		if !req.Fixed {
-			t.Error("Fixed should be true")
+		if dt["is_fixed"] != true {
+			t.Error("downtime.is_fixed should be true")
 		}
+
 		w.WriteHeader(http.StatusNoContent)
 	})
 
@@ -99,22 +137,27 @@ func TestOperationsService_Check(t *testing.T) {
 	var called bool
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/check", func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		var req CheckRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+		body := decodeBody(t, r)
+		res := resourceAt(t, body, 0)
+		if res["type"] != "service" {
+			t.Errorf("resources[0].type = %v, want service", res["type"])
 		}
-		if len(req.Resources) != 1 {
-			t.Fatalf("len(Resources) = %d, want 1", len(req.Resources))
+		parent, ok := res["parent"].(map[string]any)
+		if !ok {
+			t.Fatal("resources[0].parent is not an object")
 		}
-		if req.Resources[0].Type != "service" {
-			t.Errorf("Resources[0].Type = %q, want %q", req.Resources[0].Type, "service")
+		if parent["id"] != float64(3) {
+			t.Errorf("resources[0].parent.id = %v, want 3", parent["id"])
 		}
-		if req.Resources[0].ID != 7 {
-			t.Errorf("Resources[0].ID = %d, want 7", req.Resources[0].ID)
+
+		check, ok := body["check"].(map[string]any)
+		if !ok {
+			t.Fatal("check wrapper missing")
 		}
-		if req.Resources[0].Parent == nil || req.Resources[0].Parent.ID != 3 {
-			t.Errorf("Resources[0].Parent.ID should be 3")
+		if check["is_forced"] != true {
+			t.Errorf("check.is_forced = %v, want true", check["is_forced"])
 		}
+
 		w.WriteHeader(http.StatusNoContent)
 	})
 
@@ -137,26 +180,25 @@ func TestOperationsService_Submit(t *testing.T) {
 	var called bool
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/submit", func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		var req SubmitResultRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+		body := decodeBody(t, r)
+		res := resourceAt(t, body, 0)
+		if res["type"] != "service" {
+			t.Errorf("type = %v, want service", res["type"])
 		}
-		if len(req.Resources) != 1 {
-			t.Fatalf("len(Resources) = %d, want 1", len(req.Resources))
+		if res["output"] != "All systems nominal" {
+			t.Errorf("output = %v, want %q", res["output"], "All systems nominal")
 		}
-		res := req.Resources[0]
-		if res.Type != "service" {
-			t.Errorf("Resources[0].Type = %q, want %q", res.Type, "service")
+		if res["performance_data"] != "rta=1ms" {
+			t.Errorf("performance_data = %v, want %q", res["performance_data"], "rta=1ms")
 		}
-		if res.Status != 0 {
-			t.Errorf("Resources[0].Status = %d, want 0", res.Status)
+		parent, ok := res["parent"].(map[string]any)
+		if !ok {
+			t.Fatal("resources[0].parent is not an object")
 		}
-		if res.Output != "All systems nominal" {
-			t.Errorf("Resources[0].Output = %q, want %q", res.Output, "All systems nominal")
+		if parent["id"] != float64(1) {
+			t.Errorf("parent.id = %v, want 1", parent["id"])
 		}
-		if res.PerfData != "rta=1ms" {
-			t.Errorf("Resources[0].PerfData = %q, want %q", res.PerfData, "rta=1ms")
-		}
+
 		w.WriteHeader(http.StatusNoContent)
 	})
 
@@ -186,22 +228,19 @@ func TestOperationsService_Comment(t *testing.T) {
 	var called bool
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/comments", func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		var req CommentRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+		body := decodeBody(t, r)
+		res := resourceAt(t, body, 0)
+		if res["type"] != "host" {
+			t.Errorf("type = %v, want host", res["type"])
 		}
-		if len(req.Resources) != 1 {
-			t.Fatalf("len(Resources) = %d, want 1", len(req.Resources))
+		if res["comment"] != "Under investigation" {
+			t.Errorf("comment = %v, want %q", res["comment"], "Under investigation")
 		}
-		if req.Resources[0].Type != "host" {
-			t.Errorf("Resources[0].Type = %q, want %q", req.Resources[0].Type, "host")
+		requireNullParent(t, res, "resources[0]")
+		if _, hasDate := res["date"]; !hasDate {
+			t.Error("date is missing, want timestamp")
 		}
-		if req.Resources[0].ID != 10 {
-			t.Errorf("Resources[0].ID = %d, want 10", req.Resources[0].ID)
-		}
-		if req.Comment != "Under investigation" {
-			t.Errorf("Comment = %q, want %q", req.Comment, "Under investigation")
-		}
+
 		w.WriteHeader(http.StatusNoContent)
 	})
 

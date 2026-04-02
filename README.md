@@ -111,7 +111,7 @@ downtimes, _ := client.Downtimes.List(ctx)
 downtimes, _ := client.Downtimes.ListForHost(ctx, hostID)
 
 // Schedule a downtime on a host
-client.Downtimes.CreateForHost(ctx, hostID, &centreon.CreateDowntimeRequest{
+client.Downtimes.CreateForHost(ctx, hostID, &centreon.CreateHostDowntimeRequest{
     Comment:   "Scheduled maintenance",
     StartTime: time.Now(),
     EndTime:   time.Now().Add(2 * time.Hour),
@@ -119,7 +119,7 @@ client.Downtimes.CreateForHost(ctx, hostID, &centreon.CreateDowntimeRequest{
 })
 
 // Schedule a downtime on a service
-client.Downtimes.CreateForService(ctx, hostID, serviceID, &centreon.CreateDowntimeRequest{
+client.Downtimes.CreateForService(ctx, hostID, serviceID, &centreon.CreateServiceDowntimeRequest{
     Comment:   "Service patch",
     StartTime: time.Now(),
     EndTime:   time.Now().Add(30 * time.Minute),
@@ -140,13 +140,13 @@ client.Downtimes.CancelForHost(ctx, hostID)
 acks, _ := client.Acknowledgements.List(ctx)
 
 // Acknowledge a host
-client.Acknowledgements.CreateForHost(ctx, hostID, &centreon.CreateAcknowledgementRequest{
+client.Acknowledgements.CreateForHost(ctx, hostID, &centreon.CreateHostAcknowledgementRequest{
     Comment:  "Investigating",
     IsSticky: true,
 })
 
 // Acknowledge a service
-client.Acknowledgements.CreateForService(ctx, hostID, serviceID, &centreon.CreateAcknowledgementRequest{
+client.Acknowledgements.CreateForService(ctx, hostID, serviceID, &centreon.CreateServiceAcknowledgementRequest{
     Comment:             "Known issue, fix in progress",
     IsSticky:            true,
     IsPersistentComment: true,

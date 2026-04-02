@@ -28,14 +28,23 @@ type Downtime struct {
 	IsStarted       bool       `json:"is_started"`
 }
 
-// CreateDowntimeRequest is the request body for scheduling a downtime on a host or service.
-type CreateDowntimeRequest struct {
+// CreateHostDowntimeRequest is the request body for scheduling a downtime on a host.
+type CreateHostDowntimeRequest struct {
 	Comment      string    `json:"comment"`
 	StartTime    time.Time `json:"start_time"`
 	EndTime      time.Time `json:"end_time"`
 	IsFixed      bool      `json:"is_fixed"`
 	Duration     int       `json:"duration"`
 	WithServices bool      `json:"with_services"`
+}
+
+// CreateServiceDowntimeRequest is the request body for scheduling a downtime on a service.
+type CreateServiceDowntimeRequest struct {
+	Comment   string    `json:"comment"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+	IsFixed   bool      `json:"is_fixed"`
+	Duration  int       `json:"duration"`
 }
 
 // DowntimeService provides access to the downtime endpoints.
@@ -84,21 +93,51 @@ func (s *DowntimeService) ListForService(ctx context.Context, hostID, serviceID 
 }
 
 // CreateForHost schedules a downtime for the given host.
-func (s *DowntimeService) CreateForHost(ctx context.Context, hostID int, req *CreateDowntimeRequest) error {
+func (s *DowntimeService) CreateForHost(ctx context.Context, hostID int, req *CreateHostDowntimeRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/downtimes", hostID), req, nil)
 }
 
 // CreateForService schedules a downtime for the given service on a host.
-func (s *DowntimeService) CreateForService(ctx context.Context, hostID, serviceID int, req *CreateDowntimeRequest) error {
+func (s *DowntimeService) CreateForService(ctx context.Context, hostID, serviceID int, req *CreateServiceDowntimeRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/downtimes", hostID, serviceID), req, nil)
 }
 
-// CancelForHost cancels all downtimes for the given host.
+// CancelForHost cancels all active downtimes for the given host.
+// It lists downtimes for the host and cancels each non-cancelled one by ID.
 func (s *DowntimeService) CancelForHost(ctx context.Context, hostID int) error {
-	return s.client.delete(ctx, fmt.Sprintf("/monitoring/hosts/%d/downtimes", hostID))
+	listFn := func(ctx context.Context, opts ...ListOption) (*ListResponse[Downtime], error) {
+		return s.ListForHost(ctx, hostID, opts...)
+	}
+	for dt, err := range all(ctx, listFn, nil) {
+		if err != nil {
+			return fmt.Errorf("list downtimes for host %d: %w", hostID, err)
+		}
+		if dt.IsCancelled {
+			continue
+		}
+		if err := s.Cancel(ctx, dt.ID); err != nil {
+			return fmt.Errorf("cancel downtime %d: %w", dt.ID, err)
+		}
+	}
+	return nil
 }
 
-// CancelForService cancels all downtimes for the given service on a host.
+// CancelForService cancels all active downtimes for the given service on a host.
+// It lists downtimes for the service and cancels each non-cancelled one by ID.
 func (s *DowntimeService) CancelForService(ctx context.Context, hostID, serviceID int) error {
-	return s.client.delete(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/downtimes", hostID, serviceID))
+	listFn := func(ctx context.Context, opts ...ListOption) (*ListResponse[Downtime], error) {
+		return s.ListForService(ctx, hostID, serviceID, opts...)
+	}
+	for dt, err := range all(ctx, listFn, nil) {
+		if err != nil {
+			return fmt.Errorf("list downtimes for host %d service %d: %w", hostID, serviceID, err)
+		}
+		if dt.IsCancelled {
+			continue
+		}
+		if err := s.Cancel(ctx, dt.ID); err != nil {
+			return fmt.Errorf("cancel downtime %d: %w", dt.ID, err)
+		}
+	}
+	return nil
 }
