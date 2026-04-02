@@ -19,9 +19,9 @@ type Acknowledgement struct {
 	IsPersistentComment bool       `json:"is_persistent_comment"`
 	IsNotifyContacts    bool       `json:"is_notify_contacts"`
 	State               int        `json:"state"`
+	Type                int        `json:"type"`
 	EntryTime           time.Time  `json:"entry_time,omitzero"`
 	DeletionTime        *time.Time `json:"deletion_time"`
-	PollerID            int        `json:"poller_id"`
 }
 
 // CreateAcknowledgementRequest is the request body for acknowledging a host or service.

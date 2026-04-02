@@ -4,47 +4,45 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
-	"time"
 )
 
 func TestAcknowledgementService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	entry := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
-	svcID := 5
-
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/acknowledgements", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Acknowledgement]{
-			Result: []Acknowledgement{
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
 				{
-					ID:                  1,
-					HostID:              10,
-					AuthorID:            1,
-					AuthorName:          "admin",
-					Comment:             "Host ack",
-					IsSticky:            true,
-					IsPersistentComment: true,
-					IsNotifyContacts:    false,
-					State:               1,
-					EntryTime:           entry,
-					PollerID:            1,
+					"id":                    1,
+					"host_id":               10,
+					"author_id":             413,
+					"author_name":           "admin",
+					"comment":               "Host ack",
+					"is_sticky":             true,
+					"is_persistent_comment": true,
+					"is_notify_contacts":    false,
+					"state":                 1,
+					"type":                  1,
+					"entry_time":            "2024-01-15T09:00:00Z",
+					"deletion_time":         nil,
 				},
 				{
-					ID:                  2,
-					HostID:              10,
-					ServiceID:           &svcID,
-					AuthorID:            1,
-					AuthorName:          "admin",
-					Comment:             "Service ack",
-					IsSticky:            false,
-					IsPersistentComment: false,
-					IsNotifyContacts:    true,
-					State:               2,
-					EntryTime:           entry,
-					PollerID:            1,
+					"id":                    2,
+					"host_id":               10,
+					"service_id":            5,
+					"author_id":             413,
+					"author_name":           "admin",
+					"comment":               "Service ack",
+					"is_sticky":             false,
+					"is_persistent_comment": false,
+					"is_notify_contacts":    true,
+					"state":                 2,
+					"type":                  1,
+					"entry_time":            "2024-01-15T09:00:00Z",
+					"deletion_time":         nil,
 				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -58,32 +56,37 @@ func TestAcknowledgementService_List(t *testing.T) {
 	if resp.Result[0].Comment != "Host ack" {
 		t.Errorf("Result[0].Comment = %q, want %q", resp.Result[0].Comment, "Host ack")
 	}
+	if resp.Result[0].Type != 1 {
+		t.Errorf("Result[0].Type = %d, want 1", resp.Result[0].Type)
+	}
 	if resp.Result[1].ServiceID == nil {
 		t.Fatal("Result[1].ServiceID is nil, want non-nil")
 	}
 	if *resp.Result[1].ServiceID != 5 {
 		t.Errorf("Result[1].ServiceID = %d, want 5", *resp.Result[1].ServiceID)
 	}
+	if resp.Result[1].Type != 1 {
+		t.Errorf("Result[1].Type = %d, want 1", resp.Result[1].Type)
+	}
 }
 
 func TestAcknowledgementService_Get(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	entry := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
-
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/acknowledgements/42", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, Acknowledgement{
-			ID:                  42,
-			HostID:              10,
-			AuthorID:            1,
-			AuthorName:          "admin",
-			Comment:             "Acknowledged for investigation",
-			IsSticky:            true,
-			IsPersistentComment: true,
-			IsNotifyContacts:    false,
-			State:               1,
-			EntryTime:           entry,
-			PollerID:            1,
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":                    42,
+			"host_id":               10,
+			"author_id":             1,
+			"author_name":           "admin",
+			"comment":               "Acknowledged for investigation",
+			"is_sticky":             true,
+			"is_persistent_comment": true,
+			"is_notify_contacts":    false,
+			"state":                 1,
+			"type":                  1,
+			"entry_time":            "2024-01-15T09:00:00Z",
+			"deletion_time":         nil,
 		})
 	})
 
@@ -97,29 +100,30 @@ func TestAcknowledgementService_Get(t *testing.T) {
 	if ack.Comment != "Acknowledged for investigation" {
 		t.Errorf("Comment = %q, want %q", ack.Comment, "Acknowledged for investigation")
 	}
+	if ack.Type != 1 {
+		t.Errorf("Type = %d, want 1", ack.Type)
+	}
 }
 
 func TestAcknowledgementService_ListForHost(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	entry := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
-
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/acknowledgements", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Acknowledgement]{
-			Result: []Acknowledgement{
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
 				{
-					ID:         1,
-					HostID:     10,
-					AuthorID:   1,
-					AuthorName: "admin",
-					Comment:    "Under investigation",
-					IsSticky:   true,
-					State:      1,
-					EntryTime:  entry,
-					PollerID:   1,
+					"id":          1,
+					"host_id":     10,
+					"author_id":   1,
+					"author_name": "admin",
+					"comment":     "Under investigation",
+					"is_sticky":   true,
+					"state":       1,
+					"type":        1,
+					"entry_time":  "2024-01-15T09:00:00Z",
 				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 1},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
 	})
 

@@ -10,40 +10,42 @@ import (
 func TestDowntimeService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	start := time.Date(2024, 1, 15, 8, 0, 0, 0, time.UTC)
-	end := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
-	svcID := 5
-
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/downtimes", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Downtime]{
-			Result: []Downtime{
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
 				{
-					ID:         1,
-					HostID:     10,
-					AuthorID:   1,
-					AuthorName: "admin",
-					Comment:    "Maintenance window",
-					IsFixed:    true,
-					StartTime:  start,
-					EndTime:    end,
-					Duration:   7200,
-					PollerID:   1,
+					"id":                1,
+					"host_id":           10,
+					"author_id":         nil,
+					"author_name":       "Downtime cycle",
+					"comment":           "[Downtime cycle #1]",
+					"is_fixed":          true,
+					"start_time":        "2024-01-15T08:00:00Z",
+					"end_time":          "2024-01-15T10:00:00Z",
+					"actual_start_time": "2024-01-15T08:00:00Z",
+					"actual_end_time":   "2024-01-15T10:00:01Z",
+					"duration":          7200,
+					"poller_id":         1,
+					"is_cancelled":      false,
+					"is_started":        true,
 				},
 				{
-					ID:         2,
-					HostID:     10,
-					ServiceID:  &svcID,
-					AuthorID:   1,
-					AuthorName: "admin",
-					Comment:    "Service downtime",
-					IsFixed:    false,
-					StartTime:  start,
-					EndTime:    end,
-					Duration:   3600,
-					PollerID:   1,
+					"id":           2,
+					"host_id":      10,
+					"service_id":   5,
+					"author_id":    42,
+					"author_name":  "admin",
+					"comment":      "Service downtime",
+					"is_fixed":     false,
+					"start_time":   "2024-01-15T08:00:00Z",
+					"end_time":     "2024-01-15T10:00:00Z",
+					"duration":     3600,
+					"poller_id":    1,
+					"is_cancelled": true,
+					"is_started":   false,
 				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -54,35 +56,126 @@ func TestDowntimeService_List(t *testing.T) {
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
 	}
-	if resp.Result[0].Comment != "Maintenance window" {
-		t.Errorf("Result[0].Comment = %q, want %q", resp.Result[0].Comment, "Maintenance window")
+	if resp.Result[0].Comment != "[Downtime cycle #1]" {
+		t.Errorf("Result[0].Comment = %q, want %q", resp.Result[0].Comment, "[Downtime cycle #1]")
 	}
-	if resp.Result[1].ServiceID == nil {
-		t.Fatal("Result[1].ServiceID is nil, want non-nil")
+	if resp.Result[1].ServiceID == nil || *resp.Result[1].ServiceID != 5 {
+		t.Errorf("Result[1].ServiceID = %v, want 5", resp.Result[1].ServiceID)
 	}
-	if *resp.Result[1].ServiceID != 5 {
-		t.Errorf("Result[1].ServiceID = %d, want 5", *resp.Result[1].ServiceID)
+}
+
+func TestDowntimeService_List_NullAuthorID(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/downtimes", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{{
+				"id":                1,
+				"host_id":           10,
+				"author_id":         nil,
+				"author_name":       "Downtime cycle",
+				"comment":           "[Downtime cycle #1]",
+				"is_fixed":          true,
+				"start_time":        "2024-01-15T08:00:00Z",
+				"end_time":          "2024-01-15T10:00:00Z",
+				"actual_start_time": "2024-01-15T08:00:00Z",
+				"actual_end_time":   "2024-01-15T10:00:01Z",
+				"duration":          7200,
+				"poller_id":         1,
+				"is_cancelled":      false,
+				"is_started":        true,
+			}},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
+		})
+	})
+
+	resp, err := c.Downtimes.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	dt := resp.Result[0]
+	if dt.AuthorID != nil {
+		t.Errorf("AuthorID = %v, want nil", dt.AuthorID)
+	}
+	if dt.ActualStartTime == nil {
+		t.Fatal("ActualStartTime is nil, want non-nil")
+	}
+	if dt.ActualEndTime == nil {
+		t.Fatal("ActualEndTime is nil, want non-nil")
+	}
+	if dt.IsCancelled {
+		t.Error("IsCancelled = true, want false")
+	}
+	if !dt.IsStarted {
+		t.Error("IsStarted = false, want true")
+	}
+}
+
+func TestDowntimeService_List_CancelledDowntime(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/downtimes", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{{
+				"id":           2,
+				"host_id":      10,
+				"service_id":   5,
+				"author_id":    42,
+				"author_name":  "admin",
+				"comment":      "Service downtime",
+				"is_fixed":     false,
+				"start_time":   "2024-01-15T08:00:00Z",
+				"end_time":     "2024-01-15T10:00:00Z",
+				"duration":     3600,
+				"poller_id":    1,
+				"is_cancelled": true,
+				"is_started":   false,
+			}},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
+		})
+	})
+
+	resp, err := c.Downtimes.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	dt := resp.Result[0]
+	if dt.AuthorID == nil || *dt.AuthorID != 42 {
+		t.Errorf("AuthorID = %v, want 42", dt.AuthorID)
+	}
+	if dt.ActualStartTime != nil {
+		t.Errorf("ActualStartTime = %v, want nil", dt.ActualStartTime)
+	}
+	if dt.ActualEndTime != nil {
+		t.Errorf("ActualEndTime = %v, want nil", dt.ActualEndTime)
+	}
+	if !dt.IsCancelled {
+		t.Error("IsCancelled = false, want true")
+	}
+	if dt.IsStarted {
+		t.Error("IsStarted = true, want false")
 	}
 }
 
 func TestDowntimeService_Get(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	start := time.Date(2024, 1, 15, 8, 0, 0, 0, time.UTC)
-	end := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
-
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/downtimes/42", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, Downtime{
-			ID:         42,
-			HostID:     10,
-			AuthorID:   1,
-			AuthorName: "admin",
-			Comment:    "Planned maintenance",
-			IsFixed:    true,
-			StartTime:  start,
-			EndTime:    end,
-			Duration:   7200,
-			PollerID:   1,
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":                42,
+			"host_id":           10,
+			"author_id":         nil,
+			"author_name":       "Downtime cycle",
+			"comment":           "Planned maintenance",
+			"is_fixed":          true,
+			"start_time":        "2024-01-15T08:00:00Z",
+			"end_time":          "2024-01-15T10:00:00Z",
+			"actual_start_time": "2024-01-15T08:00:00Z",
+			"actual_end_time":   nil,
+			"duration":          7200,
+			"poller_id":         1,
+			"is_cancelled":      false,
+			"is_started":        true,
 		})
 	})
 
@@ -95,6 +188,21 @@ func TestDowntimeService_Get(t *testing.T) {
 	}
 	if dt.Comment != "Planned maintenance" {
 		t.Errorf("Comment = %q, want %q", dt.Comment, "Planned maintenance")
+	}
+	if dt.AuthorID != nil {
+		t.Errorf("AuthorID = %v, want nil", dt.AuthorID)
+	}
+	if dt.ActualStartTime == nil {
+		t.Fatal("ActualStartTime is nil, want non-nil")
+	}
+	if dt.ActualEndTime != nil {
+		t.Errorf("ActualEndTime = %v, want nil", dt.ActualEndTime)
+	}
+	if !dt.IsStarted {
+		t.Error("IsStarted = false, want true")
+	}
+	if dt.IsCancelled {
+		t.Error("IsCancelled = true, want false")
 	}
 }
 
@@ -118,26 +226,25 @@ func TestDowntimeService_Cancel(t *testing.T) {
 func TestDowntimeService_ListForHost(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	start := time.Date(2024, 1, 15, 8, 0, 0, 0, time.UTC)
-	end := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
-
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/downtimes", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Downtime]{
-			Result: []Downtime{
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
 				{
-					ID:         1,
-					HostID:     10,
-					AuthorID:   1,
-					AuthorName: "admin",
-					Comment:    "Host maintenance",
-					IsFixed:    true,
-					StartTime:  start,
-					EndTime:    end,
-					Duration:   7200,
-					PollerID:   1,
+					"id":           1,
+					"host_id":      10,
+					"author_id":    1,
+					"author_name":  "admin",
+					"comment":      "Host maintenance",
+					"is_fixed":     true,
+					"start_time":   "2024-01-15T08:00:00Z",
+					"end_time":     "2024-01-15T10:00:00Z",
+					"duration":     7200,
+					"poller_id":    1,
+					"is_cancelled": false,
+					"is_started":   true,
 				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 1},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
 	})
 
