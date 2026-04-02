@@ -5,11 +5,29 @@ import (
 	"iter"
 )
 
+// MonitoringServiceHost is the nested host reference in a monitoring service response.
+type MonitoringServiceHost struct {
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Alias string `json:"alias,omitzero"`
+	State int    `json:"state"`
+}
+
 // MonitoringService represents a service as seen from the monitoring engine.
 type MonitoringService struct {
-	ID     int            `json:"id"`
-	Name   string         `json:"name"`
-	Status ResourceStatus `json:"status"`
+	ID               int                   `json:"id"`
+	Description      string                `json:"description"`
+	DisplayName      string                `json:"display_name,omitzero"`
+	Host             MonitoringServiceHost `json:"host"`
+	State            int                   `json:"state"`
+	StateType        int                   `json:"state_type"`
+	Output           string                `json:"output,omitzero"`
+	Status           ResourceStatus        `json:"status"`
+	Acknowledged     bool                  `json:"is_acknowledged"`
+	DowntimeDepth    int                   `json:"scheduled_downtime_depth"`
+	LastCheck        string                `json:"last_check,omitzero"`
+	LastStateChange  string                `json:"last_state_change,omitzero"`
+	MaxCheckAttempts int                   `json:"max_check_attempts"`
 }
 
 // ServiceStatusCount holds status counts for services.

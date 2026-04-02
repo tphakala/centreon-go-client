@@ -194,12 +194,34 @@ func TestMonitoringHostService_Services(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/services", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[MonitoringService]{
-			Result: []MonitoringService{
-				{ID: 1, Name: "Ping", Status: ResourceStatus{Code: 0, Name: "OK", SeverityCode: 5}},
-				{ID: 2, Name: "CPU", Status: ResourceStatus{Code: 1, Name: "WARNING", SeverityCode: 3}},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{
+					"id":                       1,
+					"description":              "Ping",
+					"host":                     map[string]any{"id": 10, "name": "web01", "state": 0},
+					"state":                    0,
+					"state_type":               1,
+					"output":                   "OK - rta 0.5ms",
+					"status":                   map[string]any{"code": 0, "name": "OK", "severity_code": 5},
+					"is_acknowledged":          false,
+					"scheduled_downtime_depth": 0,
+					"max_check_attempts":       3,
+				},
+				{
+					"id":                       2,
+					"description":              "CPU",
+					"host":                     map[string]any{"id": 10, "name": "web01", "state": 0},
+					"state":                    1,
+					"state_type":               1,
+					"output":                   "WARNING: CPU 85%",
+					"status":                   map[string]any{"code": 1, "name": "WARNING", "severity_code": 3},
+					"is_acknowledged":          false,
+					"scheduled_downtime_depth": 0,
+					"max_check_attempts":       2,
+				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -210,8 +232,17 @@ func TestMonitoringHostService_Services(t *testing.T) {
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
 	}
-	if resp.Result[0].Name != "Ping" {
-		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "Ping")
+	if resp.Result[0].Description != "Ping" {
+		t.Errorf("Result[0].Description = %q, want %q", resp.Result[0].Description, "Ping")
+	}
+	if resp.Result[0].Host.ID != 10 {
+		t.Errorf("Result[0].Host.ID = %d, want 10", resp.Result[0].Host.ID)
+	}
+	if resp.Result[0].State != 0 {
+		t.Errorf("Result[0].State = %d, want 0", resp.Result[0].State)
+	}
+	if resp.Result[0].Output != "OK - rta 0.5ms" {
+		t.Errorf("Result[0].Output = %q, want %q", resp.Result[0].Output, "OK - rta 0.5ms")
 	}
 }
 
