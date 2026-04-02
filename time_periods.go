@@ -47,7 +47,7 @@ type TimePeriodService struct {
 // List returns a paginated list of time periods.
 func (s *TimePeriodService) List(ctx context.Context, opts ...ListOption) (*ListResponse[TimePeriod], error) {
 	var resp ListResponse[TimePeriod]
-	err := s.client.list(ctx, "/configuration/time-periods", opts, &resp)
+	err := s.client.list(ctx, "/configuration/timeperiods", opts, &resp)
 	return &resp, err
 }
 
@@ -59,7 +59,7 @@ func (s *TimePeriodService) All(ctx context.Context, opts ...ListOption) iter.Se
 // Get returns the time period with the given ID.
 func (s *TimePeriodService) Get(ctx context.Context, id int) (*TimePeriod, error) {
 	var tp TimePeriod
-	if err := s.client.get(ctx, fmt.Sprintf("/configuration/time-periods/%d", id), &tp); err != nil {
+	if err := s.client.get(ctx, fmt.Sprintf("/configuration/timeperiods/%d", id), &tp); err != nil {
 		return nil, err
 	}
 	return &tp, nil
@@ -70,7 +70,7 @@ func (s *TimePeriodService) Create(ctx context.Context, req CreateTimePeriodRequ
 	var result struct {
 		ID int `json:"id"`
 	}
-	if err := s.client.post(ctx, "/configuration/time-periods", req, &result); err != nil {
+	if err := s.client.post(ctx, "/configuration/timeperiods", req, &result); err != nil {
 		return 0, err
 	}
 	return result.ID, nil
@@ -78,10 +78,10 @@ func (s *TimePeriodService) Create(ctx context.Context, req CreateTimePeriodRequ
 
 // Update replaces an existing time period using PUT.
 func (s *TimePeriodService) Update(ctx context.Context, id int, req UpdateTimePeriodRequest) error {
-	return s.client.put(ctx, fmt.Sprintf("/configuration/time-periods/%d", id), req)
+	return s.client.put(ctx, fmt.Sprintf("/configuration/timeperiods/%d", id), req)
 }
 
 // Delete deletes a time period by ID.
 func (s *TimePeriodService) Delete(ctx context.Context, id int) error {
-	return s.client.delete(ctx, fmt.Sprintf("/configuration/time-periods/%d", id))
+	return s.client.delete(ctx, fmt.Sprintf("/configuration/timeperiods/%d", id))
 }
