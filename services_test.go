@@ -2,7 +2,6 @@ package centreon
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"testing"
 )
@@ -11,12 +10,42 @@ func TestServiceService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/services", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Service]{
-			Result: []Service{
-				{ID: 1, HostID: 10, Name: "Ping", IsActivated: true},
-				{ID: 2, HostID: 10, Name: "CPU", IsActivated: true},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{
+					"id":   2755,
+					"name": "Broker-Stats",
+					"hosts": []map[string]any{
+						{"id": 10246, "name": "AAAAAAProbe-template"},
+					},
+					"service_template":        map[string]any{"id": 666, "name": "App-Monitoring-Centreon-Broker-Stats-Poller-custom"},
+					"check_timeperiod":        nil,
+					"notification_timeperiod": nil,
+					"severity":                nil,
+					"categories":              []map[string]any{},
+					"groups":                  []map[string]any{},
+					"normal_check_interval":   nil,
+					"retry_check_interval":    nil,
+					"is_activated":            true,
+				},
+				{
+					"id":   2800,
+					"name": "CPU",
+					"hosts": []map[string]any{
+						{"id": 10246, "name": "AAAAAAProbe-template"},
+					},
+					"service_template":        nil,
+					"check_timeperiod":        nil,
+					"notification_timeperiod": nil,
+					"severity":                nil,
+					"categories":              []map[string]any{},
+					"groups":                  []map[string]any{},
+					"normal_check_interval":   5,
+					"retry_check_interval":    1,
+					"is_activated":            true,
+				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -27,55 +56,74 @@ func TestServiceService_List(t *testing.T) {
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
 	}
-	if resp.Result[0].Name != "Ping" {
-		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "Ping")
+
+	svc := resp.Result[0]
+	if svc.Name != "Broker-Stats" {
+		t.Errorf("Result[0].Name = %q, want %q", svc.Name, "Broker-Stats")
+	}
+	if len(svc.Hosts) != 1 || svc.Hosts[0].ID != 10246 {
+		t.Errorf("Result[0].Hosts = %+v, want [{ID:10246 Name:AAAAAAProbe-template}]", svc.Hosts)
+	}
+	if svc.ServiceTemplate == nil || svc.ServiceTemplate.ID != 666 {
+		t.Errorf("Result[0].ServiceTemplate = %+v, want &{ID:666}", svc.ServiceTemplate)
+	}
+	if !svc.IsActivated {
+		t.Error("Result[0].IsActivated = false, want true")
+	}
+
+	svc2 := resp.Result[1]
+	if svc2.NormalCheckInterval == nil || *svc2.NormalCheckInterval != 5 {
+		t.Errorf("Result[1].NormalCheckInterval = %v, want 5", svc2.NormalCheckInterval)
+	}
+	if svc2.RetryCheckInterval == nil || *svc2.RetryCheckInterval != 1 {
+		t.Errorf("Result[1].RetryCheckInterval = %v, want 1", svc2.RetryCheckInterval)
 	}
 }
 
-func TestServiceService_GetByID_Found(t *testing.T) {
+func TestServiceService_ListByHost(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/services", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Service]{
-			Result: []Service{
-				{ID: 42, HostID: 10, Name: "Ping", IsActivated: true},
+		search := r.URL.Query().Get("search")
+		if search == "" {
+			t.Error("expected search parameter, got empty")
+		}
+		// Verify the search parameter contains host.id filter
+		if search != `{"host.id":{"$eq":10246}}` {
+			t.Errorf("search = %q, want host.id eq filter", search)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{
+					"id":   2755,
+					"name": "Broker-Stats",
+					"hosts": []map[string]any{
+						{"id": 10246, "name": "AAAAAAProbe-template"},
+					},
+					"service_template":        nil,
+					"check_timeperiod":        nil,
+					"notification_timeperiod": nil,
+					"severity":                nil,
+					"categories":              []map[string]any{},
+					"groups":                  []map[string]any{},
+					"normal_check_interval":   nil,
+					"retry_check_interval":    nil,
+					"is_activated":            true,
+				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 1},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
 	})
 
-	svc, err := c.Services.GetByID(t.Context(), 42)
+	resp, err := c.Services.ListByHost(t.Context(), 10246)
 	if err != nil {
-		t.Fatalf("GetByID: %v", err)
+		t.Fatalf("ListByHost: %v", err)
 	}
-	if svc.ID != 42 {
-		t.Errorf("ID = %d, want 42", svc.ID)
+	if len(resp.Result) != 1 {
+		t.Fatalf("len(Result) = %d, want 1", len(resp.Result))
 	}
-	if svc.Name != "Ping" {
-		t.Errorf("Name = %q, want %q", svc.Name, "Ping")
-	}
-}
-
-func TestServiceService_GetByID_NotFound(t *testing.T) {
-	mux, c := newTestMux(t)
-
-	mux.HandleFunc("GET /centreon/api/latest/configuration/services", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Service]{
-			Result: []Service{},
-			Meta:   Meta{Page: 1, Limit: 10, Total: 0},
-		})
-	})
-
-	_, err := c.Services.GetByID(t.Context(), 999)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	nfe, ok := errors.AsType[*NotFoundError](err)
-	if !ok {
-		t.Fatalf("expected *NotFoundError, got %T: %v", err, err)
-	}
-	if nfe.ID != 999 {
-		t.Errorf("NotFoundError.ID = %d, want 999", nfe.ID)
+	if len(resp.Result[0].Hosts) != 1 || resp.Result[0].Hosts[0].ID != 10246 {
+		t.Errorf("Hosts = %+v, want [{ID:10246 ...}]", resp.Result[0].Hosts)
 	}
 }
 

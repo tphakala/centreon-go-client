@@ -8,16 +8,18 @@ import (
 
 // Service represents a Centreon service configuration resource.
 type Service struct {
-	ID                  int    `json:"id"`
-	HostID              int    `json:"host_id"`
-	Name                string `json:"name"`
-	Alias               string `json:"alias,omitzero"`
-	CheckCommandID      int    `json:"check_command_id,omitzero"`
-	MaxCheckAttempts    int    `json:"max_check_attempts,omitzero"`
-	NormalCheckInterval int    `json:"normal_check_interval,omitzero"`
-	RetryCheckInterval  int    `json:"retry_check_interval,omitzero"`
-	ActiveChecksEnabled *bool  `json:"active_checks_enabled"`
-	IsActivated         bool   `json:"is_activated"`
+	ID                  int        `json:"id"`
+	Name                string     `json:"name"`
+	Hosts               []NamedRef `json:"hosts,omitzero"`
+	ServiceTemplate     *NamedRef  `json:"service_template"`
+	CheckTimeperiod     *NamedRef  `json:"check_timeperiod"`
+	NotifTimeperiod     *NamedRef  `json:"notification_timeperiod"`
+	Severity            *NamedRef  `json:"severity"`
+	Categories          []NamedRef `json:"categories,omitzero"`
+	Groups              []NamedRef `json:"groups,omitzero"`
+	NormalCheckInterval *int       `json:"normal_check_interval"`
+	RetryCheckInterval  *int       `json:"retry_check_interval"`
+	IsActivated         bool       `json:"is_activated"`
 }
 
 // CreateServiceRequest is the request body for creating a service.
@@ -96,10 +98,12 @@ func (s *ServiceService) All(ctx context.Context, opts ...ListOption) iter.Seq2[
 	return all(ctx, s.List, opts)
 }
 
-// GetByID returns the service with the given ID using a filtered list lookup.
-// Returns *NotFoundError if not found.
-func (s *ServiceService) GetByID(ctx context.Context, id int) (*Service, error) {
-	return getByID(ctx, s.List, "service", id)
+// ListByHost returns a paginated list of services for the given host ID.
+// This is the recommended way to find services since the services endpoint
+// does not support search by service ID.
+func (s *ServiceService) ListByHost(ctx context.Context, hostID int, opts ...ListOption) (*ListResponse[Service], error) {
+	opts = append(opts, WithSearch(Eq("host.id", hostID)))
+	return s.List(ctx, opts...)
 }
 
 // Create creates a new service and returns its ID.

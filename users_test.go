@@ -10,12 +10,12 @@ func TestUserService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/users", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[User]{
-			Result: []User{
-				{ID: 1, Name: "admin", Alias: "Administrator", Email: "admin@example.com", IsAdmin: true, IsActivated: true},
-				{ID: 2, Name: "user1", Alias: "User One", Email: "user1@example.com", IsAdmin: false, IsActivated: true},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "name": "admin", "alias": "Administrator", "email": "admin@example.com", "is_admin": true},
+				{"id": 2, "name": "user1", "alias": "User One", "email": "user1@example.com", "is_admin": false},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -29,8 +29,14 @@ func TestUserService_List(t *testing.T) {
 	if resp.Result[0].Name != "admin" {
 		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "admin")
 	}
+	if !resp.Result[0].IsAdmin {
+		t.Error("Result[0].IsAdmin = false, want true")
+	}
 	if resp.Result[1].Name != "user1" {
 		t.Errorf("Result[1].Name = %q, want %q", resp.Result[1].Name, "user1")
+	}
+	if resp.Result[1].IsAdmin {
+		t.Error("Result[1].IsAdmin = true, want false")
 	}
 }
 

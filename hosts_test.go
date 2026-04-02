@@ -7,17 +7,109 @@ import (
 	"testing"
 )
 
+func TestNamedRef_JSON(t *testing.T) {
+	orig := NamedRef{ID: 4, Name: "probe-05"}
+
+	data, err := json.Marshal(orig)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	var got NamedRef
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+
+	if got != orig {
+		t.Errorf("round-trip mismatch: got %+v, want %+v", got, orig)
+	}
+}
+
+// realisticHostListJSON returns a two-host JSON fixture that mirrors the live
+// Centreon API response shape, including null-valued optional fields.
+func realisticHostListJSON() map[string]any {
+	return map[string]any{
+		"result": []map[string]any{
+			{
+				"id":                      1,
+				"name":                    "host-01",
+				"alias":                   "Host 01",
+				"address":                 "10.0.0.1",
+				"monitoring_server":       map[string]any{"id": 4, "name": "poller-01"},
+				"templates":               []map[string]any{{"id": 684, "name": "Ping_only"}},
+				"normal_check_interval":   nil,
+				"retry_check_interval":    nil,
+				"notification_timeperiod": nil,
+				"check_timeperiod":        nil,
+				"severity":                nil,
+				"categories":              []map[string]any{{"id": 29, "name": "Managed_VPN"}},
+				"groups":                  []map[string]any{{"id": 1310, "name": "test-group"}},
+				"is_activated":            true,
+			},
+			{
+				"id":                      2,
+				"name":                    "host-02",
+				"alias":                   "",
+				"address":                 "10.0.0.2",
+				"monitoring_server":       map[string]any{"id": 4, "name": "poller-01"},
+				"templates":               []map[string]any{},
+				"normal_check_interval":   5,
+				"retry_check_interval":    1,
+				"notification_timeperiod": nil,
+				"check_timeperiod":        map[string]any{"id": 2, "name": "24x7"},
+				"severity":                nil,
+				"categories":              []map[string]any{},
+				"groups":                  []map[string]any{},
+				"is_activated":            true,
+			},
+		},
+		"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
+	}
+}
+
+func checkHostWithNullIntervals(t *testing.T, h *Host) {
+	t.Helper()
+	if h.MonitoringServer.ID != 4 {
+		t.Errorf("MonitoringServer.ID = %d, want 4", h.MonitoringServer.ID)
+	}
+	if h.Name != "host-01" {
+		t.Errorf("Name = %q, want %q", h.Name, "host-01")
+	}
+	if len(h.Templates) != 1 || h.Templates[0].ID != 684 {
+		t.Errorf("Templates = %+v, want [{684 Ping_only}]", h.Templates)
+	}
+	if len(h.Categories) != 1 || h.Categories[0].ID != 29 {
+		t.Errorf("Categories = %+v, want [{29 Managed_VPN}]", h.Categories)
+	}
+	if len(h.Groups) != 1 || h.Groups[0].ID != 1310 {
+		t.Errorf("Groups = %+v, want [{1310 test-group}]", h.Groups)
+	}
+	if h.NormalCheckInterval != nil {
+		t.Errorf("NormalCheckInterval = %v, want nil", h.NormalCheckInterval)
+	}
+	if !h.IsActivated {
+		t.Error("IsActivated = false, want true")
+	}
+}
+
+func checkHostWithPopulatedIntervals(t *testing.T, h *Host) {
+	t.Helper()
+	if h.NormalCheckInterval == nil || *h.NormalCheckInterval != 5 {
+		t.Errorf("NormalCheckInterval = %v, want 5", h.NormalCheckInterval)
+	}
+	if h.RetryCheckInterval == nil || *h.RetryCheckInterval != 1 {
+		t.Errorf("RetryCheckInterval = %v, want 1", h.RetryCheckInterval)
+	}
+	if h.CheckTimeperiod == nil || h.CheckTimeperiod.ID != 2 {
+		t.Errorf("CheckTimeperiod = %v, want {2 24x7}", h.CheckTimeperiod)
+	}
+}
+
 func TestHostService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Host]{
-			Result: []Host{
-				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
-				{ID: 2, Name: "host-02", Address: "10.0.0.2", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
-			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
-		})
+		writeJSON(w, http.StatusOK, realisticHostListJSON())
 	})
 
 	resp, err := c.Hosts.List(t.Context())
@@ -27,12 +119,14 @@ func TestHostService_List(t *testing.T) {
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
 	}
-	if resp.Result[0].MonitoringServer.ID != 1 {
-		t.Errorf("Result[0].MonitoringServer.ID = %d, want 1", resp.Result[0].MonitoringServer.ID)
-	}
-	if resp.Result[0].Name != "host-01" {
-		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "host-01")
-	}
+
+	t.Run("host_with_null_intervals", func(t *testing.T) {
+		checkHostWithNullIntervals(t, &resp.Result[0])
+	})
+
+	t.Run("host_with_populated_intervals", func(t *testing.T) {
+		checkHostWithPopulatedIntervals(t, &resp.Result[1])
+	})
 }
 
 func TestHostService_List_WithSearch(t *testing.T) {
@@ -42,11 +136,25 @@ func TestHostService_List_WithSearch(t *testing.T) {
 		if r.URL.Query().Get("search") == "" {
 			t.Error("expected search query param")
 		}
-		writeJSON(w, http.StatusOK, ListResponse[Host]{
-			Result: []Host{
-				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{
+					"id":                      1,
+					"name":                    "host-01",
+					"address":                 "10.0.0.1",
+					"monitoring_server":       map[string]any{"id": 1, "name": "Central"},
+					"templates":               []map[string]any{},
+					"normal_check_interval":   nil,
+					"retry_check_interval":    nil,
+					"notification_timeperiod": nil,
+					"check_timeperiod":        nil,
+					"severity":                nil,
+					"categories":              []map[string]any{},
+					"groups":                  []map[string]any{},
+					"is_activated":            true,
+				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 1},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
 	})
 
@@ -63,11 +171,26 @@ func TestHostService_GetByID_Found(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Host]{
-			Result: []Host{
-				{ID: 42, Name: "host-42", Address: "10.0.0.42", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{
+					"id":                      42,
+					"name":                    "host-42",
+					"alias":                   "Host 42",
+					"address":                 "10.0.0.42",
+					"monitoring_server":       map[string]any{"id": 1, "name": "Central"},
+					"templates":               []map[string]any{{"id": 10, "name": "Tmpl-A"}},
+					"normal_check_interval":   nil,
+					"retry_check_interval":    nil,
+					"notification_timeperiod": nil,
+					"check_timeperiod":        nil,
+					"severity":                map[string]any{"id": 5, "name": "Critical"},
+					"categories":              []map[string]any{{"id": 3, "name": "Linux"}},
+					"groups":                  []map[string]any{},
+					"is_activated":            true,
+				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 1},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
 	})
 
@@ -80,6 +203,21 @@ func TestHostService_GetByID_Found(t *testing.T) {
 	}
 	if host.Name != "host-42" {
 		t.Errorf("Name = %q, want %q", host.Name, "host-42")
+	}
+	if host.MonitoringServer.ID != 1 {
+		t.Errorf("MonitoringServer.ID = %d, want 1", host.MonitoringServer.ID)
+	}
+	if len(host.Templates) != 1 || host.Templates[0].ID != 10 {
+		t.Errorf("Templates = %+v, want [{10 Tmpl-A}]", host.Templates)
+	}
+	if host.Severity == nil || host.Severity.ID != 5 {
+		t.Errorf("Severity = %v, want {5 Critical}", host.Severity)
+	}
+	if len(host.Categories) != 1 || host.Categories[0].Name != "Linux" {
+		t.Errorf("Categories = %+v, want [{3 Linux}]", host.Categories)
+	}
+	if !host.IsActivated {
+		t.Error("IsActivated = false, want true")
 	}
 }
 

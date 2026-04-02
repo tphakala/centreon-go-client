@@ -9,20 +9,23 @@ import (
 
 // Downtime represents a scheduled downtime for a host or service.
 type Downtime struct {
-	ID             int        `json:"id"`
-	HostID         int        `json:"host_id"`
-	ServiceID      *int       `json:"service_id"`
-	AuthorID       int        `json:"author_id"`
-	AuthorName     string     `json:"author_name"`
-	Comment        string     `json:"comment"`
-	IsFixed        bool       `json:"is_fixed"`
-	StartTime      time.Time  `json:"start_time"`
-	EndTime        time.Time  `json:"end_time"`
-	Duration       int        `json:"duration"`
-	ActivationTime time.Time  `json:"activation_time,omitzero"`
-	EntryTime      time.Time  `json:"entry_time,omitzero"`
-	DeletionTime   *time.Time `json:"deletion_time"`
-	PollerID       int        `json:"poller_id"`
+	ID              int        `json:"id"`
+	HostID          int        `json:"host_id"`
+	ServiceID       *int       `json:"service_id"`
+	AuthorID        *int       `json:"author_id"`
+	AuthorName      string     `json:"author_name"`
+	Comment         string     `json:"comment"`
+	IsFixed         bool       `json:"is_fixed"`
+	StartTime       time.Time  `json:"start_time"`
+	EndTime         time.Time  `json:"end_time"`
+	ActualStartTime *time.Time `json:"actual_start_time"`
+	ActualEndTime   *time.Time `json:"actual_end_time"`
+	Duration        int        `json:"duration"`
+	EntryTime       time.Time  `json:"entry_time,omitzero"`
+	DeletionTime    *time.Time `json:"deletion_time"`
+	PollerID        int        `json:"poller_id"`
+	IsCancelled     bool       `json:"is_cancelled"`
+	IsStarted       bool       `json:"is_started"`
 }
 
 // CreateDowntimeRequest is the request body for scheduling a downtime on a host or service.

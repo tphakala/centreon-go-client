@@ -196,11 +196,11 @@ func ExampleTimePeriodService_Create() {
 		Name:  "business-hours",
 		Alias: "Business Hours",
 		Days: []centreon.TimePeriodDay{
-			{Day: "monday", TimeRanges: []centreon.TimeRange{{Start: "08:00", End: "17:00"}}},
-			{Day: "tuesday", TimeRanges: []centreon.TimeRange{{Start: "08:00", End: "17:00"}}},
-			{Day: "wednesday", TimeRanges: []centreon.TimeRange{{Start: "08:00", End: "17:00"}}},
-			{Day: "thursday", TimeRanges: []centreon.TimeRange{{Start: "08:00", End: "17:00"}}},
-			{Day: "friday", TimeRanges: []centreon.TimeRange{{Start: "08:00", End: "17:00"}}},
+			{Day: 1, TimeRange: "08:00-17:00"},
+			{Day: 2, TimeRange: "08:00-17:00"},
+			{Day: 3, TimeRange: "08:00-17:00"},
+			{Day: 4, TimeRange: "08:00-17:00"},
+			{Day: 5, TimeRange: "08:00-17:00"},
 		},
 	})
 	if err != nil {

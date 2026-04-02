@@ -8,7 +8,7 @@ import (
 // NotificationPolicy represents the notification policy for a host or service.
 type NotificationPolicy struct {
 	IsNotificationEnabled bool           `json:"is_notification_enabled"`
-	Users                 []User         `json:"users,omitzero"`
+	Contacts              []User         `json:"contacts,omitzero"`
 	ContactGroups         []ContactGroup `json:"contact_groups,omitzero"`
 }
 

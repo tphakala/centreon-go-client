@@ -13,7 +13,7 @@ type User struct {
 	Alias       string `json:"alias,omitzero"`
 	Email       string `json:"email,omitzero"`
 	IsAdmin     bool   `json:"is_admin"`
-	IsActivated bool   `json:"is_activated"`
+	IsActivated bool   `json:"is_activated,omitzero"`
 }
 
 // UpdateUserRequest is the request body for updating a user (PATCH).

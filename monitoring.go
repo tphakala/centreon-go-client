@@ -13,14 +13,32 @@ type ResourceStatus struct {
 	SeverityCode int    `json:"severity_code"`
 }
 
-// MonitoringResource represents a unified monitoring resource (host or service).
-type MonitoringResource struct {
+// MonitoringResourceParent represents the parent resource (typically a host for a service).
+type MonitoringResourceParent struct {
 	ID     int            `json:"id"`
 	Name   string         `json:"name"`
-	Type   string         `json:"type"` // "host" or "service"
-	Alias  string         `json:"alias,omitzero"`
-	FQDN   string         `json:"fqdn,omitzero"`
+	Type   string         `json:"type"`
 	Status ResourceStatus `json:"status"`
+}
+
+// MonitoringResource represents a unified monitoring resource (host or service).
+type MonitoringResource struct {
+	ID                   int                       `json:"id"`
+	Name                 string                    `json:"name"`
+	Type                 string                    `json:"type"` // "host" or "service"
+	Alias                string                    `json:"alias,omitzero"`
+	FQDN                 string                    `json:"fqdn,omitzero"`
+	HostID               int                       `json:"host_id,omitzero"`
+	ServiceID            int                       `json:"service_id,omitzero"`
+	MonitoringServerName string                    `json:"monitoring_server_name,omitzero"`
+	Parent               *MonitoringResourceParent `json:"parent"`
+	Status               ResourceStatus            `json:"status"`
+	IsInDowntime         bool                      `json:"is_in_downtime"`
+	IsAcknowledged       bool                      `json:"is_acknowledged"`
+	Information          string                    `json:"information,omitzero"`
+	Tries                string                    `json:"tries,omitzero"`
+	LastStatusChange     string                    `json:"last_status_change,omitzero"`
+	NotificationEnabled  bool                      `json:"is_notification_enabled"`
 }
 
 // MonitoringResourceService provides access to the unified monitoring resources endpoint.

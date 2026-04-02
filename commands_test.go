@@ -9,11 +9,11 @@ func TestCommandService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/commands", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[Command]{
-			Result: []Command{
-				{ID: 1, Name: "check_ping", Type: 2, CommandLine: "/usr/lib/nagios/plugins/check_ping -H $HOSTADDRESS$"},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "name": "check_ping", "type": 2, "command_line": "/usr/lib/nagios/plugins/check_ping -H $HOSTADDRESS$", "is_shell": true, "is_locked": false, "is_activated": true},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 1},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
 	})
 
@@ -33,5 +33,14 @@ func TestCommandService_List(t *testing.T) {
 	}
 	if cmd.CommandLine != "/usr/lib/nagios/plugins/check_ping -H $HOSTADDRESS$" {
 		t.Errorf("CommandLine = %q, unexpected value", cmd.CommandLine)
+	}
+	if !cmd.IsShell {
+		t.Error("IsShell = false, want true")
+	}
+	if cmd.IsLocked {
+		t.Error("IsLocked = true, want false")
+	}
+	if !cmd.IsActivated {
+		t.Error("IsActivated = false, want true")
 	}
 }
