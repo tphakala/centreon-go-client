@@ -16,9 +16,9 @@ type ResourceRef struct {
 type AcknowledgeRequest struct {
 	Resources           []ResourceRef `json:"resources"`
 	Comment             string        `json:"comment"`
-	IsNotifyContacts    bool          `json:"is_notify_contacts,omitzero"`
-	IsPersistentComment bool          `json:"is_persistent_comment,omitzero"`
-	IsSticky            bool          `json:"is_sticky,omitzero"`
+	IsNotifyContacts    bool          `json:"is_notify_contacts"`
+	IsPersistentComment bool          `json:"is_persistent_comment"`
+	IsSticky            bool          `json:"is_sticky"`
 }
 
 // DowntimeRequest is the request body for scheduling downtime on resources.
@@ -28,7 +28,7 @@ type DowntimeRequest struct {
 	StartTime time.Time     `json:"start_time"`
 	EndTime   time.Time     `json:"end_time"`
 	Fixed     bool          `json:"is_fixed"`
-	Duration  int           `json:"duration,omitzero"`
+	Duration  int           `json:"duration"`
 }
 
 // CheckRequest is the request body for forcing checks on resources.

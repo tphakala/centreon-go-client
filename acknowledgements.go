@@ -27,10 +27,10 @@ type Acknowledgement struct {
 // CreateAcknowledgementRequest is the request body for acknowledging a host or service.
 type CreateAcknowledgementRequest struct {
 	Comment             string `json:"comment"`
-	IsNotifyContacts    bool   `json:"is_notify_contacts,omitzero"`
-	IsPersistentComment bool   `json:"is_persistent_comment,omitzero"`
-	IsSticky            bool   `json:"is_sticky,omitzero"`
-	WithServices        bool   `json:"with_services,omitzero"`
+	IsNotifyContacts    bool   `json:"is_notify_contacts"`
+	IsPersistentComment bool   `json:"is_persistent_comment"`
+	IsSticky            bool   `json:"is_sticky"`
+	WithServices        bool   `json:"with_services"`
 }
 
 // AcknowledgementService provides access to the acknowledgement endpoints.
