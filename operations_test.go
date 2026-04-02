@@ -150,8 +150,12 @@ func TestOperationsService_Check(t *testing.T) {
 			t.Errorf("resources[0].parent.id = %v, want 3", parent["id"])
 		}
 
-		if _, ok := body["check"]; !ok {
+		check, ok := body["check"].(map[string]any)
+		if !ok {
 			t.Fatal("check wrapper missing")
+		}
+		if check["is_forced"] != true {
+			t.Errorf("check.is_forced = %v, want true", check["is_forced"])
 		}
 
 		w.WriteHeader(http.StatusNoContent)
