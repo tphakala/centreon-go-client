@@ -122,8 +122,8 @@ func TestServiceService_ListByHost(t *testing.T) {
 	if len(resp.Result) != 1 {
 		t.Fatalf("len(Result) = %d, want 1", len(resp.Result))
 	}
-	if resp.Result[0].Hosts[0].ID != 10246 {
-		t.Errorf("Hosts[0].ID = %d, want 10246", resp.Result[0].Hosts[0].ID)
+	if len(resp.Result[0].Hosts) != 1 || resp.Result[0].Hosts[0].ID != 10246 {
+		t.Errorf("Hosts = %+v, want [{ID:10246 ...}]", resp.Result[0].Hosts)
 	}
 }
 
