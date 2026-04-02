@@ -27,16 +27,18 @@ type TimePeriodDay struct {
 
 // CreateTimePeriodRequest is the request body for creating a time period.
 type CreateTimePeriodRequest struct {
-	Name  string          `json:"name"`
-	Alias string          `json:"alias"`
-	Days  []TimePeriodDay `json:"days,omitzero"`
+	Name      string          `json:"name"`
+	Alias     string          `json:"alias"`
+	Days      []TimePeriodDay `json:"days"`
+	Templates []int           `json:"templates"`
 }
 
 // UpdateTimePeriodRequest is the request body for replacing a time period (PUT).
 type UpdateTimePeriodRequest struct {
-	Name  string          `json:"name"`
-	Alias string          `json:"alias"`
-	Days  []TimePeriodDay `json:"days,omitzero"`
+	Name      string          `json:"name"`
+	Alias     string          `json:"alias"`
+	Days      []TimePeriodDay `json:"days"`
+	Templates []int           `json:"templates"`
 }
 
 // TimePeriodService provides time period configuration operations.
@@ -66,7 +68,13 @@ func (s *TimePeriodService) Get(ctx context.Context, id int) (*TimePeriod, error
 }
 
 // Create creates a new time period and returns its ID.
-func (s *TimePeriodService) Create(ctx context.Context, req CreateTimePeriodRequest) (int, error) {
+func (s *TimePeriodService) Create(ctx context.Context, req *CreateTimePeriodRequest) (int, error) {
+	if req.Days == nil {
+		req.Days = []TimePeriodDay{}
+	}
+	if req.Templates == nil {
+		req.Templates = []int{}
+	}
 	var result struct {
 		ID int `json:"id"`
 	}
@@ -77,7 +85,13 @@ func (s *TimePeriodService) Create(ctx context.Context, req CreateTimePeriodRequ
 }
 
 // Update replaces an existing time period using PUT.
-func (s *TimePeriodService) Update(ctx context.Context, id int, req UpdateTimePeriodRequest) error {
+func (s *TimePeriodService) Update(ctx context.Context, id int, req *UpdateTimePeriodRequest) error {
+	if req.Days == nil {
+		req.Days = []TimePeriodDay{}
+	}
+	if req.Templates == nil {
+		req.Templates = []int{}
+	}
 	return s.client.put(ctx, fmt.Sprintf("/configuration/timeperiods/%d", id), req)
 }
 

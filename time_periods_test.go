@@ -1,7 +1,6 @@
 package centreon
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 )
@@ -103,29 +102,31 @@ func TestTimePeriodService_Create(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("POST /centreon/api/latest/configuration/timeperiods", func(w http.ResponseWriter, r *http.Request) {
-		var req CreateTimePeriodRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+		body := decodeBody(t, r)
+		if body["name"] != "business-hours" {
+			t.Errorf("name = %q, want %q", body["name"], "business-hours")
 		}
-		if req.Name != "business-hours" {
-			t.Errorf("Name = %q, want %q", req.Name, "business-hours")
+		if body["alias"] != "Business Hours" {
+			t.Errorf("alias = %q, want %q", body["alias"], "Business Hours")
 		}
-		if req.Alias != "Business Hours" {
-			t.Errorf("Alias = %q, want %q", req.Alias, "Business Hours")
+		days, ok := body["days"].([]any)
+		if !ok {
+			t.Fatalf("days must be an array, got %T (%v)", body["days"], body["days"])
 		}
-		if len(req.Days) != 1 {
-			t.Fatalf("len(Days) = %d, want 1", len(req.Days))
+		if len(days) != 1 {
+			t.Fatalf("len(days) = %d, want 1", len(days))
 		}
-		if req.Days[0].Day != 1 {
-			t.Errorf("Days[0].Day = %d, want 1", req.Days[0].Day)
+		templates, ok := body["templates"].([]any)
+		if !ok {
+			t.Fatalf("templates must be an array, got %T (%v)", body["templates"], body["templates"])
 		}
-		if req.Days[0].TimeRange != "08:00-18:00" {
-			t.Errorf("Days[0].TimeRange = %q, want %q", req.Days[0].TimeRange, "08:00-18:00")
+		if len(templates) != 0 {
+			t.Errorf("len(templates) = %d, want 0", len(templates))
 		}
 		writeJSON(w, http.StatusCreated, map[string]int{"id": 5})
 	})
 
-	id, err := c.TimePeriods.Create(t.Context(), CreateTimePeriodRequest{
+	id, err := c.TimePeriods.Create(t.Context(), &CreateTimePeriodRequest{
 		Name:  "business-hours",
 		Alias: "Business Hours",
 		Days: []TimePeriodDay{
@@ -140,24 +141,51 @@ func TestTimePeriodService_Create(t *testing.T) {
 	}
 }
 
+func TestTimePeriodService_Create_NilSlices(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/configuration/timeperiods", func(w http.ResponseWriter, r *http.Request) {
+		body := decodeBody(t, r)
+		// API rejects null — both must be arrays even when caller omits them.
+		if _, ok := body["days"].([]any); !ok {
+			t.Errorf("days must be an array, got %T (%v)", body["days"], body["days"])
+		}
+		if _, ok := body["templates"].([]any); !ok {
+			t.Errorf("templates must be an array, got %T (%v)", body["templates"], body["templates"])
+		}
+		writeJSON(w, http.StatusCreated, map[string]int{"id": 6})
+	})
+
+	_, err := c.TimePeriods.Create(t.Context(), &CreateTimePeriodRequest{
+		Name:  "minimal",
+		Alias: "Minimal",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+}
+
 func TestTimePeriodService_Update(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("PUT /centreon/api/latest/configuration/timeperiods/5", func(w http.ResponseWriter, r *http.Request) {
-		var req UpdateTimePeriodRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode body: %v", err)
+		body := decodeBody(t, r)
+		if body["name"] != "updated-hours" {
+			t.Errorf("name = %q, want %q", body["name"], "updated-hours")
 		}
-		if req.Name != "updated-hours" {
-			t.Errorf("Name = %q, want %q", req.Name, "updated-hours")
+		if body["alias"] != "Updated Hours" {
+			t.Errorf("alias = %q, want %q", body["alias"], "Updated Hours")
 		}
-		if req.Alias != "Updated Hours" {
-			t.Errorf("Alias = %q, want %q", req.Alias, "Updated Hours")
+		if _, ok := body["days"].([]any); !ok {
+			t.Errorf("days must be an array, got %T (%v)", body["days"], body["days"])
+		}
+		if _, ok := body["templates"].([]any); !ok {
+			t.Errorf("templates must be an array, got %T (%v)", body["templates"], body["templates"])
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.TimePeriods.Update(t.Context(), 5, UpdateTimePeriodRequest{
+	err := c.TimePeriods.Update(t.Context(), 5, &UpdateTimePeriodRequest{
 		Name:  "updated-hours",
 		Alias: "Updated Hours",
 	})

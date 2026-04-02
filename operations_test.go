@@ -149,6 +149,12 @@ func TestOperationsService_Check(t *testing.T) {
 		if parent["id"] != float64(3) {
 			t.Errorf("resources[0].parent.id = %v, want 3", parent["id"])
 		}
+		if _, hasType := parent["type"]; hasType {
+			t.Error("resources[0].parent.type must not be present; API rejects it")
+		}
+		if _, hasParent := parent["parent"]; hasParent {
+			t.Error("resources[0].parent.parent must not be present; API rejects it")
+		}
 
 		check, ok := body["check"].(map[string]any)
 		if !ok {
@@ -163,7 +169,7 @@ func TestOperationsService_Check(t *testing.T) {
 
 	err := c.Operations.Check(t.Context(), &CheckRequest{
 		Resources: []ResourceRef{
-			{Type: "service", ID: 7, Parent: &ResourceRef{Type: "host", ID: 3}},
+			{Type: "service", ID: 7, Parent: &ParentRef{ID: 3}},
 		},
 	})
 	if err != nil {
@@ -198,6 +204,9 @@ func TestOperationsService_Submit(t *testing.T) {
 		if parent["id"] != float64(1) {
 			t.Errorf("parent.id = %v, want 1", parent["id"])
 		}
+		if _, hasType := parent["type"]; hasType {
+			t.Error("resources[0].parent.type must not be present; API rejects it")
+		}
 
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -207,7 +216,7 @@ func TestOperationsService_Submit(t *testing.T) {
 			{
 				Type:     "service",
 				ID:       5,
-				Parent:   &ResourceRef{Type: "host", ID: 1},
+				Parent:   &ParentRef{ID: 1},
 				Status:   0,
 				Output:   "All systems nominal",
 				PerfData: "rta=1ms",

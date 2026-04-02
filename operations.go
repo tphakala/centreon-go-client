@@ -5,11 +5,18 @@ import (
 	"time"
 )
 
+// ParentRef identifies a parent host for a service resource. Only ID is sent
+// on the wire because the monitoring endpoints reject additional fields in the
+// parent object (e.g. "type" or nested "parent").
+type ParentRef struct {
+	ID int `json:"id"`
+}
+
 // ResourceRef identifies a monitoring resource.
 type ResourceRef struct {
-	Type   string       `json:"type"` // "host" or "service"
-	ID     int          `json:"id"`
-	Parent *ResourceRef `json:"parent"`
+	Type   string     `json:"type"` // "host" or "service"
+	ID     int        `json:"id"`
+	Parent *ParentRef `json:"parent"`
 }
 
 // AcknowledgeRequest is the request body for acknowledging resources.
@@ -38,12 +45,12 @@ type CheckRequest struct {
 
 // SubmitResource is a single resource result to submit.
 type SubmitResource struct {
-	Type     string       `json:"type"`
-	ID       int          `json:"id"`
-	Parent   *ResourceRef `json:"parent"`
-	Status   int          `json:"status"`
-	Output   string       `json:"output"`
-	PerfData string       `json:"performance_data,omitempty"`
+	Type     string     `json:"type"`
+	ID       int        `json:"id"`
+	Parent   *ParentRef `json:"parent"`
+	Status   int        `json:"status"`
+	Output   string     `json:"output"`
+	PerfData string     `json:"performance_data,omitempty"`
 }
 
 // SubmitResultRequest is the request body for submitting check results.
@@ -91,11 +98,11 @@ type checkParam struct {
 }
 
 type commentResource struct {
-	Type    string       `json:"type"`
-	ID      int          `json:"id"`
-	Parent  *ResourceRef `json:"parent"`
-	Comment string       `json:"comment"`
-	Date    time.Time    `json:"date"`
+	Type    string     `json:"type"`
+	ID      int        `json:"id"`
+	Parent  *ParentRef `json:"parent"`
+	Comment string     `json:"comment"`
+	Date    time.Time  `json:"date"`
 }
 type commentBody struct {
 	Resources []commentResource `json:"resources"`

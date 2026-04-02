@@ -192,7 +192,7 @@ func ExampleTimePeriodService_Create() {
 		centreon.WithAPIToken("token"),
 	)
 
-	id, err := client.TimePeriods.Create(ctx, centreon.CreateTimePeriodRequest{
+	id, err := client.TimePeriods.Create(ctx, &centreon.CreateTimePeriodRequest{
 		Name:  "business-hours",
 		Alias: "Business Hours",
 		Days: []centreon.TimePeriodDay{
