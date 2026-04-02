@@ -9,11 +9,21 @@ import (
 
 // MonitoringHost represents a host as seen from the monitoring engine.
 type MonitoringHost struct {
-	ID      int            `json:"id"`
-	Name    string         `json:"name"`
-	Address string         `json:"address,omitzero"`
-	Alias   string         `json:"alias,omitzero"`
-	Status  ResourceStatus `json:"status"`
+	ID               int     `json:"id"`
+	Name             string  `json:"name"`
+	AddressIP        string  `json:"address_ip,omitzero"`
+	Alias            string  `json:"alias,omitzero"`
+	State            int     `json:"state"`
+	StateType        int     `json:"state_type"`
+	Output           string  `json:"output,omitzero"`
+	Acknowledged     bool    `json:"acknowledged"`
+	PollerID         int     `json:"poller_id"`
+	CheckAttempt     int     `json:"check_attempt"`
+	MaxCheckAttempts int     `json:"max_check_attempts"`
+	LastCheck        string  `json:"last_check,omitzero"`
+	LastStateChange  string  `json:"last_state_change,omitzero"`
+	ExecutionTime    float64 `json:"execution_time"`
+	DowntimeDepth    int     `json:"scheduled_downtime_depth"`
 }
 
 // StatusValue holds a count with a total subfield, as returned by the Centreon API.

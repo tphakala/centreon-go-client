@@ -1,32 +1,62 @@
 package centreon
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
 )
 
+// checkMonitoringHost asserts all fields of a MonitoringHost against expected values.
+func checkMonitoringHost(t *testing.T, label string, got, want *MonitoringHost) {
+	t.Helper()
+	if *got != *want {
+		t.Errorf("%s mismatch:\n got  %+v\n want %+v", label, *got, *want)
+	}
+}
+
 func TestMonitoringHostService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[MonitoringHost]{
-			Result: []MonitoringHost{
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
 				{
-					ID:      1,
-					Name:    "host-01",
-					Address: "10.0.0.1",
-					Alias:   "Main host",
-					Status:  ResourceStatus{Code: 0, Name: "UP", SeverityCode: 5},
+					"id":                       1,
+					"poller_id":                1,
+					"name":                     "host-01",
+					"acknowledged":             false,
+					"address_ip":               "10.0.0.1",
+					"alias":                    "Main host",
+					"check_attempt":            1,
+					"max_check_attempts":       3,
+					"state":                    0,
+					"state_type":               1,
+					"output":                   "OK - 10.0.0.1 rta 0.5ms lost 0%\n",
+					"execution_time":           0.099,
+					"last_check":               "2026-04-02T09:33:56+03:00",
+					"last_state_change":        "2026-04-01T20:10:45+03:00",
+					"scheduled_downtime_depth": 0,
 				},
 				{
-					ID:      2,
-					Name:    "host-02",
-					Address: "10.0.0.2",
-					Status:  ResourceStatus{Code: 1, Name: "DOWN", SeverityCode: 1},
+					"id":                       2,
+					"poller_id":                2,
+					"name":                     "host-02",
+					"acknowledged":             true,
+					"address_ip":               "10.0.0.2",
+					"alias":                    "",
+					"check_attempt":            2,
+					"max_check_attempts":       3,
+					"state":                    1,
+					"state_type":               1,
+					"output":                   "CRITICAL - Host unreachable\n",
+					"execution_time":           0.012,
+					"last_check":               "2026-04-02T09:34:00+03:00",
+					"last_state_change":        "2026-04-02T08:00:00+03:00",
+					"scheduled_downtime_depth": 1,
 				},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -37,23 +67,45 @@ func TestMonitoringHostService_List(t *testing.T) {
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
 	}
-	if resp.Result[0].Name != "host-01" {
-		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "host-01")
-	}
-	if resp.Result[1].Status.Name != "DOWN" {
-		t.Errorf("Result[1].Status.Name = %q, want %q", resp.Result[1].Status.Name, "DOWN")
-	}
+
+	checkMonitoringHost(t, "Result[0]", &resp.Result[0], &MonitoringHost{
+		ID: 1, PollerID: 1, Name: "host-01", AddressIP: "10.0.0.1",
+		Alias: "Main host", State: 0, StateType: 1,
+		Output: "OK - 10.0.0.1 rta 0.5ms lost 0%\n", Acknowledged: false,
+		CheckAttempt: 1, MaxCheckAttempts: 3, ExecutionTime: 0.099,
+		LastCheck: "2026-04-02T09:33:56+03:00", LastStateChange: "2026-04-01T20:10:45+03:00",
+		DowntimeDepth: 0,
+	})
+
+	checkMonitoringHost(t, "Result[1]", &resp.Result[1], &MonitoringHost{
+		ID: 2, PollerID: 2, Name: "host-02", AddressIP: "10.0.0.2",
+		State: 1, StateType: 1, Output: "CRITICAL - Host unreachable\n",
+		Acknowledged: true, CheckAttempt: 2, MaxCheckAttempts: 3,
+		ExecutionTime: 0.012, LastCheck: "2026-04-02T09:34:00+03:00",
+		LastStateChange: "2026-04-02T08:00:00+03:00", DowntimeDepth: 1,
+	})
 }
 
 func TestMonitoringHostService_Get(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/42", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, MonitoringHost{
-			ID:      42,
-			Name:    "host-42",
-			Address: "10.0.0.42",
-			Status:  ResourceStatus{Code: 0, Name: "UP", SeverityCode: 5},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":                       42,
+			"poller_id":                1,
+			"name":                     "host-42",
+			"acknowledged":             false,
+			"address_ip":               "10.0.0.42",
+			"alias":                    "test-host",
+			"check_attempt":            1,
+			"max_check_attempts":       2,
+			"state":                    0,
+			"state_type":               1,
+			"output":                   "OK - 10.0.0.42 rta 0.2ms lost 0%\n",
+			"execution_time":           0.055,
+			"last_check":               "2026-04-02T10:00:00+03:00",
+			"last_state_change":        "2026-04-01T12:00:00+03:00",
+			"scheduled_downtime_depth": 0,
 		})
 	})
 
@@ -61,12 +113,50 @@ func TestMonitoringHostService_Get(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if host.ID != 42 {
-		t.Errorf("ID = %d, want 42", host.ID)
+
+	checkMonitoringHost(t, "host", host, &MonitoringHost{
+		ID: 42, PollerID: 1, Name: "host-42", AddressIP: "10.0.0.42",
+		Alias: "test-host", State: 0, StateType: 1,
+		Output:        "OK - 10.0.0.42 rta 0.2ms lost 0%\n",
+		ExecutionTime: 0.055, CheckAttempt: 1, MaxCheckAttempts: 2,
+		LastCheck: "2026-04-02T10:00:00+03:00", LastStateChange: "2026-04-01T12:00:00+03:00",
+	})
+}
+
+// TestMonitoringHostService_Get_RoundTrip verifies that the struct deserializes
+// correctly from the exact JSON the live Centreon API returns.
+func TestMonitoringHostService_Get_RoundTrip(t *testing.T) {
+	apiJSON := `{
+		"id": 10300,
+		"poller_id": 1,
+		"name": "19-11-2025_Host_on_central",
+		"acknowledged": false,
+		"address_ip": "10.204.74.29",
+		"alias": "testmonmap03",
+		"check_attempt": 1,
+		"max_check_attempts": 2,
+		"state": 0,
+		"state_type": 1,
+		"output": "OK - 10.204.74.29 rta 0.223ms lost 0%\n",
+		"execution_time": 0.099193,
+		"last_check": "2026-04-02T09:33:56+03:00",
+		"last_state_change": "2026-04-01T20:10:45+03:00",
+		"scheduled_downtime_depth": 0
+	}`
+
+	var host MonitoringHost
+	if err := json.Unmarshal([]byte(apiJSON), &host); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
 	}
-	if host.Name != "host-42" {
-		t.Errorf("Name = %q, want %q", host.Name, "host-42")
-	}
+
+	checkMonitoringHost(t, "host", &host, &MonitoringHost{
+		ID: 10300, PollerID: 1, Name: "19-11-2025_Host_on_central",
+		AddressIP: "10.204.74.29", Alias: "testmonmap03",
+		State: 0, StateType: 1,
+		Output:        "OK - 10.204.74.29 rta 0.223ms lost 0%\n",
+		ExecutionTime: 0.099193, CheckAttempt: 1, MaxCheckAttempts: 2,
+		LastCheck: "2026-04-02T09:33:56+03:00", LastStateChange: "2026-04-01T20:10:45+03:00",
+	})
 }
 
 func TestMonitoringHostService_StatusCounts(t *testing.T) {
