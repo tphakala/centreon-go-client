@@ -273,8 +273,8 @@ func cmdUsers(ctx context.Context, client *centreon.Client) {
 	}
 	fmt.Printf("Users (%d total, showing %d):\n", resp.Meta.Total, len(resp.Result))
 	for _, u := range resp.Result {
-		fmt.Printf("  %5d  %-20s  %-30s  admin=%v  active=%v\n",
-			u.ID, u.Name, u.Email, u.IsAdmin, u.IsActivated)
+		fmt.Printf("  %5d  %-20s  %-30s  admin=%v\n",
+			u.ID, u.Name, u.Email, u.IsAdmin)
 	}
 }
 

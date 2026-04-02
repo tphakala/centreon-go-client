@@ -11,6 +11,9 @@ type Command struct {
 	Name        string `json:"name"`
 	Type        int    `json:"type"`
 	CommandLine string `json:"command_line"`
+	IsShell     bool   `json:"is_shell"`
+	IsLocked    bool   `json:"is_locked"`
+	IsActivated bool   `json:"is_activated"`
 }
 
 type CommandService struct {

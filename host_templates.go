@@ -11,19 +11,18 @@ type HostTemplate struct {
 	ID                  int    `json:"id"`
 	Name                string `json:"name"`
 	Alias               string `json:"alias,omitzero"`
-	Address             string `json:"address,omitzero"`
-	CheckCommandID      int    `json:"check_command_id,omitzero"`
-	MaxCheckAttempts    int    `json:"max_check_attempts,omitzero"`
-	NormalCheckInterval int    `json:"normal_check_interval,omitzero"`
-	RetryCheckInterval  int    `json:"retry_check_interval,omitzero"`
-	IsActivated         bool   `json:"is_activated"`
+	CheckCommandID      *int   `json:"check_command_id"`
+	CheckTimeperiodID   *int   `json:"check_timeperiod_id"`
+	MaxCheckAttempts    *int   `json:"max_check_attempts"`
+	NormalCheckInterval *int   `json:"normal_check_interval"`
+	RetryCheckInterval  *int   `json:"retry_check_interval"`
+	IsLocked            bool   `json:"is_locked"`
 }
 
 // CreateHostTemplateRequest is the request body for creating a host template.
 type CreateHostTemplateRequest struct {
 	Name           string `json:"name"`
 	Alias          string `json:"alias,omitzero"`
-	Address        string `json:"address,omitzero"`
 	CheckCommandID int    `json:"check_command_id,omitzero"`
 }
 
@@ -31,12 +30,12 @@ type CreateHostTemplateRequest struct {
 type UpdateHostTemplateRequest struct {
 	Name                *string `json:"name,omitempty"`
 	Alias               *string `json:"alias,omitempty"`
-	Address             *string `json:"address,omitempty"`
 	CheckCommandID      *int    `json:"check_command_id,omitempty"`
+	CheckTimeperiodID   *int    `json:"check_timeperiod_id,omitempty"`
 	MaxCheckAttempts    *int    `json:"max_check_attempts,omitempty"`
 	NormalCheckInterval *int    `json:"normal_check_interval,omitempty"`
 	RetryCheckInterval  *int    `json:"retry_check_interval,omitempty"`
-	IsActivated         *bool   `json:"is_activated,omitempty"`
+	IsLocked            *bool   `json:"is_locked,omitempty"`
 }
 
 // HostTemplateService provides host template configuration operations.

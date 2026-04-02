@@ -11,12 +11,12 @@ func TestHostTemplateService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts/templates", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[HostTemplate]{
-			Result: []HostTemplate{
-				{ID: 1, Name: "tpl-linux", Alias: "Linux Template", Address: "0.0.0.0", IsActivated: true},
-				{ID: 2, Name: "tpl-windows", Alias: "Windows Template", Address: "0.0.0.0", IsActivated: true},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "name": "tpl-linux", "alias": "Linux Template", "check_command_id": nil, "check_timeperiod_id": 1, "max_check_attempts": nil, "normal_check_interval": nil, "retry_check_interval": nil, "is_locked": false},
+				{"id": 2, "name": "tpl-windows", "alias": "Windows Template", "check_command_id": 5, "check_timeperiod_id": nil, "max_check_attempts": 3, "normal_check_interval": 5, "retry_check_interval": 1, "is_locked": true},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -27,8 +27,30 @@ func TestHostTemplateService_List(t *testing.T) {
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
 	}
-	if resp.Result[0].Name != "tpl-linux" {
-		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "tpl-linux")
+
+	tpl0 := resp.Result[0]
+	if tpl0.Name != "tpl-linux" {
+		t.Errorf("Result[0].Name = %q, want %q", tpl0.Name, "tpl-linux")
+	}
+	if tpl0.CheckCommandID != nil {
+		t.Errorf("Result[0].CheckCommandID = %v, want nil", tpl0.CheckCommandID)
+	}
+	if tpl0.CheckTimeperiodID == nil || *tpl0.CheckTimeperiodID != 1 {
+		t.Errorf("Result[0].CheckTimeperiodID = %v, want 1", tpl0.CheckTimeperiodID)
+	}
+	if tpl0.IsLocked {
+		t.Error("Result[0].IsLocked = true, want false")
+	}
+
+	tpl1 := resp.Result[1]
+	if tpl1.CheckCommandID == nil || *tpl1.CheckCommandID != 5 {
+		t.Errorf("Result[1].CheckCommandID = %v, want 5", tpl1.CheckCommandID)
+	}
+	if tpl1.MaxCheckAttempts == nil || *tpl1.MaxCheckAttempts != 3 {
+		t.Errorf("Result[1].MaxCheckAttempts = %v, want 3", tpl1.MaxCheckAttempts)
+	}
+	if !tpl1.IsLocked {
+		t.Error("Result[1].IsLocked = false, want true")
 	}
 }
 
@@ -36,11 +58,11 @@ func TestHostTemplateService_GetByID_Found(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts/templates", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[HostTemplate]{
-			Result: []HostTemplate{
-				{ID: 10, Name: "tpl-snmp", Alias: "SNMP Template", Address: "0.0.0.0", IsActivated: true},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 10, "name": "tpl-snmp", "alias": "SNMP Template", "check_command_id": nil, "check_timeperiod_id": nil, "max_check_attempts": nil, "normal_check_interval": nil, "retry_check_interval": nil, "is_locked": false},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 1},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
 	})
 
@@ -90,16 +112,12 @@ func TestHostTemplateService_Create(t *testing.T) {
 		if req.Name != "tpl-new" {
 			t.Errorf("Name = %q, want %q", req.Name, "tpl-new")
 		}
-		if req.Address != "0.0.0.0" {
-			t.Errorf("Address = %q, want %q", req.Address, "0.0.0.0")
-		}
 		writeJSON(w, http.StatusCreated, map[string]int{"id": 20})
 	})
 
 	id, err := c.HostTemplates.Create(t.Context(), CreateHostTemplateRequest{
-		Name:    "tpl-new",
-		Alias:   "New Template",
-		Address: "0.0.0.0",
+		Name:  "tpl-new",
+		Alias: "New Template",
 	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)

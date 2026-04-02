@@ -10,6 +10,7 @@ type ContactGroup struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	Alias       string `json:"alias,omitzero"`
+	Type        string `json:"type,omitzero"`
 	IsActivated bool   `json:"is_activated"`
 }
 

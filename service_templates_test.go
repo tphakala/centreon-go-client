@@ -11,12 +11,12 @@ func TestServiceTemplateService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/services/templates", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[ServiceTemplate]{
-			Result: []ServiceTemplate{
-				{ID: 1, Name: "generic-service", IsActivated: true},
-				{ID: 2, Name: "ping-template", IsActivated: true},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "name": "generic-service", "alias": "Generic", "check_command_id": nil, "check_timeperiod_id": 1, "max_check_attempts": nil, "normal_check_interval": nil, "retry_check_interval": nil, "is_locked": false},
+				{"id": 2, "name": "ping-template", "alias": "Ping", "check_command_id": 3, "check_timeperiod_id": nil, "max_check_attempts": 5, "normal_check_interval": 10, "retry_check_interval": 2, "is_locked": true},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -27,8 +27,30 @@ func TestServiceTemplateService_List(t *testing.T) {
 	if len(resp.Result) != 2 {
 		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
 	}
-	if resp.Result[0].Name != "generic-service" {
-		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "generic-service")
+
+	tpl0 := resp.Result[0]
+	if tpl0.Name != "generic-service" {
+		t.Errorf("Result[0].Name = %q, want %q", tpl0.Name, "generic-service")
+	}
+	if tpl0.CheckCommandID != nil {
+		t.Errorf("Result[0].CheckCommandID = %v, want nil", tpl0.CheckCommandID)
+	}
+	if tpl0.CheckTimeperiodID == nil || *tpl0.CheckTimeperiodID != 1 {
+		t.Errorf("Result[0].CheckTimeperiodID = %v, want 1", tpl0.CheckTimeperiodID)
+	}
+	if tpl0.IsLocked {
+		t.Error("Result[0].IsLocked = true, want false")
+	}
+
+	tpl1 := resp.Result[1]
+	if tpl1.CheckCommandID == nil || *tpl1.CheckCommandID != 3 {
+		t.Errorf("Result[1].CheckCommandID = %v, want 3", tpl1.CheckCommandID)
+	}
+	if tpl1.MaxCheckAttempts == nil || *tpl1.MaxCheckAttempts != 5 {
+		t.Errorf("Result[1].MaxCheckAttempts = %v, want 5", tpl1.MaxCheckAttempts)
+	}
+	if !tpl1.IsLocked {
+		t.Error("Result[1].IsLocked = false, want true")
 	}
 }
 
@@ -36,11 +58,11 @@ func TestServiceTemplateService_GetByID_Found(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/services/templates", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[ServiceTemplate]{
-			Result: []ServiceTemplate{
-				{ID: 42, Name: "generic-service", IsActivated: true},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 42, "name": "generic-service", "alias": "Generic", "check_command_id": nil, "check_timeperiod_id": nil, "max_check_attempts": nil, "normal_check_interval": nil, "retry_check_interval": nil, "is_locked": false},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 1},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
 		})
 	})
 
