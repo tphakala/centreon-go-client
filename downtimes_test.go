@@ -400,33 +400,87 @@ func TestDowntimeService_CreateForHost_WithServices(t *testing.T) {
 func TestDowntimeService_CancelForHost(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	var called bool
-	mux.HandleFunc("DELETE /centreon/api/latest/monitoring/hosts/10/downtimes", func(w http.ResponseWriter, r *http.Request) {
-		called = true
+	var cancelledIDs []string
+
+	// List endpoint returns 2 downtimes (1 active, 1 already cancelled)
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/downtimes", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "host_id": 10, "comment": "dt1", "is_fixed": true,
+					"start_time": "2024-01-15T08:00:00Z", "end_time": "2024-01-15T10:00:00Z",
+					"duration": 7200, "poller_id": 1, "is_cancelled": false, "is_started": true,
+					"author_name": "admin"},
+				{"id": 2, "host_id": 10, "comment": "dt2", "is_fixed": true,
+					"start_time": "2024-01-15T08:00:00Z", "end_time": "2024-01-15T10:00:00Z",
+					"duration": 7200, "poller_id": 1, "is_cancelled": true, "is_started": false,
+					"author_name": "admin"},
+			},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
+		})
+	})
+
+	// Cancel endpoint — only downtime 1 should be cancelled (2 is already cancelled)
+	mux.HandleFunc("DELETE /centreon/api/latest/monitoring/downtimes/1", func(w http.ResponseWriter, r *http.Request) {
+		cancelledIDs = append(cancelledIDs, "1")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
 	if err := c.Downtimes.CancelForHost(t.Context(), 10); err != nil {
 		t.Fatalf("CancelForHost: %v", err)
 	}
-	if !called {
-		t.Error("handler was not called")
+	if len(cancelledIDs) != 1 {
+		t.Fatalf("cancelled %d downtimes, want 1", len(cancelledIDs))
+	}
+	if cancelledIDs[0] != "1" {
+		t.Errorf("cancelled ID = %q, want %q", cancelledIDs[0], "1")
 	}
 }
 
 func TestDowntimeService_CancelForService(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	var called bool
-	mux.HandleFunc("DELETE /centreon/api/latest/monitoring/hosts/10/services/5/downtimes", func(w http.ResponseWriter, r *http.Request) {
-		called = true
+	var cancelledIDs []string
+
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/services/5/downtimes", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 3, "host_id": 10, "service_id": 5, "comment": "svc dt",
+					"is_fixed": true, "start_time": "2024-01-15T08:00:00Z",
+					"end_time": "2024-01-15T10:00:00Z", "duration": 3600,
+					"poller_id": 1, "is_cancelled": false, "is_started": true,
+					"author_name": "admin"},
+			},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 1},
+		})
+	})
+
+	mux.HandleFunc("DELETE /centreon/api/latest/monitoring/downtimes/3", func(w http.ResponseWriter, r *http.Request) {
+		cancelledIDs = append(cancelledIDs, "3")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
 	if err := c.Downtimes.CancelForService(t.Context(), 10, 5); err != nil {
 		t.Fatalf("CancelForService: %v", err)
 	}
-	if !called {
-		t.Error("handler was not called")
+	if len(cancelledIDs) != 1 {
+		t.Fatalf("cancelled %d downtimes, want 1", len(cancelledIDs))
+	}
+	if cancelledIDs[0] != "3" {
+		t.Errorf("cancelled ID = %q, want %q", cancelledIDs[0], "3")
+	}
+}
+
+func TestDowntimeService_CancelForHost_NoneActive(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/downtimes", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{},
+			"meta":   map[string]any{"page": 1, "limit": 10, "total": 0},
+		})
+	})
+
+	if err := c.Downtimes.CancelForHost(t.Context(), 10); err != nil {
+		t.Fatalf("CancelForHost: %v", err)
 	}
 }

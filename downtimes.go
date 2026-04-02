@@ -102,12 +102,42 @@ func (s *DowntimeService) CreateForService(ctx context.Context, hostID, serviceI
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/downtimes", hostID, serviceID), req, nil)
 }
 
-// CancelForHost cancels all downtimes for the given host.
+// CancelForHost cancels all active downtimes for the given host.
+// It lists downtimes for the host and cancels each non-cancelled one by ID.
 func (s *DowntimeService) CancelForHost(ctx context.Context, hostID int) error {
-	return s.client.delete(ctx, fmt.Sprintf("/monitoring/hosts/%d/downtimes", hostID))
+	listFn := func(ctx context.Context, opts ...ListOption) (*ListResponse[Downtime], error) {
+		return s.ListForHost(ctx, hostID, opts...)
+	}
+	for dt, err := range all(ctx, listFn, nil) {
+		if err != nil {
+			return fmt.Errorf("list downtimes for host %d: %w", hostID, err)
+		}
+		if dt.IsCancelled {
+			continue
+		}
+		if err := s.Cancel(ctx, dt.ID); err != nil {
+			return fmt.Errorf("cancel downtime %d: %w", dt.ID, err)
+		}
+	}
+	return nil
 }
 
-// CancelForService cancels all downtimes for the given service on a host.
+// CancelForService cancels all active downtimes for the given service on a host.
+// It lists downtimes for the service and cancels each non-cancelled one by ID.
 func (s *DowntimeService) CancelForService(ctx context.Context, hostID, serviceID int) error {
-	return s.client.delete(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/downtimes", hostID, serviceID))
+	listFn := func(ctx context.Context, opts ...ListOption) (*ListResponse[Downtime], error) {
+		return s.ListForService(ctx, hostID, serviceID, opts...)
+	}
+	for dt, err := range all(ctx, listFn, nil) {
+		if err != nil {
+			return fmt.Errorf("list downtimes for host %d service %d: %w", hostID, serviceID, err)
+		}
+		if dt.IsCancelled {
+			continue
+		}
+		if err := s.Cancel(ctx, dt.ID); err != nil {
+			return fmt.Errorf("cancel downtime %d: %w", dt.ID, err)
+		}
+	}
+	return nil
 }
