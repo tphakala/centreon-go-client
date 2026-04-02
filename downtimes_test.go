@@ -291,7 +291,7 @@ func TestDowntimeService_CreateForHost(t *testing.T) {
 
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/downtimes", func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		var req CreateDowntimeRequest
+		var req CreateHostDowntimeRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode body: %v", err)
 		}
@@ -310,7 +310,7 @@ func TestDowntimeService_CreateForHost(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Downtimes.CreateForHost(t.Context(), 10, &CreateDowntimeRequest{
+	err := c.Downtimes.CreateForHost(t.Context(), 10, &CreateHostDowntimeRequest{
 		Comment:   "Host maintenance",
 		StartTime: start,
 		EndTime:   end,
@@ -334,7 +334,7 @@ func TestDowntimeService_CreateForService(t *testing.T) {
 
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/services/5/downtimes", func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		var req CreateDowntimeRequest
+		var req CreateServiceDowntimeRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode body: %v", err)
 		}
@@ -356,7 +356,7 @@ func TestDowntimeService_CreateForService(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Downtimes.CreateForService(t.Context(), 10, 5, &CreateDowntimeRequest{
+	err := c.Downtimes.CreateForService(t.Context(), 10, 5, &CreateServiceDowntimeRequest{
 		Comment:   "Service maintenance",
 		StartTime: start,
 		EndTime:   end,
@@ -385,7 +385,7 @@ func TestDowntimeService_CreateForHost_WithServices(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	err := c.Downtimes.CreateForHost(t.Context(), 10, &CreateDowntimeRequest{
+	err := c.Downtimes.CreateForHost(t.Context(), 10, &CreateHostDowntimeRequest{
 		Comment:      "test",
 		StartTime:    time.Now(),
 		EndTime:      time.Now().Add(time.Hour),

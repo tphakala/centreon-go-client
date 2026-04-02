@@ -24,13 +24,21 @@ type Acknowledgement struct {
 	DeletionTime        *time.Time `json:"deletion_time"`
 }
 
-// CreateAcknowledgementRequest is the request body for acknowledging a host or service.
-type CreateAcknowledgementRequest struct {
+// CreateHostAcknowledgementRequest is the request body for acknowledging a host.
+type CreateHostAcknowledgementRequest struct {
 	Comment             string `json:"comment"`
 	IsNotifyContacts    bool   `json:"is_notify_contacts"`
 	IsPersistentComment bool   `json:"is_persistent_comment"`
 	IsSticky            bool   `json:"is_sticky"`
 	WithServices        bool   `json:"with_services"`
+}
+
+// CreateServiceAcknowledgementRequest is the request body for acknowledging a service.
+type CreateServiceAcknowledgementRequest struct {
+	Comment             string `json:"comment"`
+	IsNotifyContacts    bool   `json:"is_notify_contacts"`
+	IsPersistentComment bool   `json:"is_persistent_comment"`
+	IsSticky            bool   `json:"is_sticky"`
 }
 
 // AcknowledgementService provides access to the acknowledgement endpoints.
@@ -74,12 +82,12 @@ func (s *AcknowledgementService) ListForService(ctx context.Context, hostID, ser
 }
 
 // CreateForHost acknowledges the given host.
-func (s *AcknowledgementService) CreateForHost(ctx context.Context, hostID int, req *CreateAcknowledgementRequest) error {
+func (s *AcknowledgementService) CreateForHost(ctx context.Context, hostID int, req *CreateHostAcknowledgementRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/acknowledgements", hostID), req, nil)
 }
 
 // CreateForService acknowledges the given service on a host.
-func (s *AcknowledgementService) CreateForService(ctx context.Context, hostID, serviceID int, req *CreateAcknowledgementRequest) error {
+func (s *AcknowledgementService) CreateForService(ctx context.Context, hostID, serviceID int, req *CreateServiceAcknowledgementRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/acknowledgements", hostID, serviceID), req, nil)
 }
 

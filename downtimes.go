@@ -28,14 +28,23 @@ type Downtime struct {
 	IsStarted       bool       `json:"is_started"`
 }
 
-// CreateDowntimeRequest is the request body for scheduling a downtime on a host or service.
-type CreateDowntimeRequest struct {
+// CreateHostDowntimeRequest is the request body for scheduling a downtime on a host.
+type CreateHostDowntimeRequest struct {
 	Comment      string    `json:"comment"`
 	StartTime    time.Time `json:"start_time"`
 	EndTime      time.Time `json:"end_time"`
 	IsFixed      bool      `json:"is_fixed"`
 	Duration     int       `json:"duration"`
 	WithServices bool      `json:"with_services"`
+}
+
+// CreateServiceDowntimeRequest is the request body for scheduling a downtime on a service.
+type CreateServiceDowntimeRequest struct {
+	Comment   string    `json:"comment"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+	IsFixed   bool      `json:"is_fixed"`
+	Duration  int       `json:"duration"`
 }
 
 // DowntimeService provides access to the downtime endpoints.
@@ -84,12 +93,12 @@ func (s *DowntimeService) ListForService(ctx context.Context, hostID, serviceID 
 }
 
 // CreateForHost schedules a downtime for the given host.
-func (s *DowntimeService) CreateForHost(ctx context.Context, hostID int, req *CreateDowntimeRequest) error {
+func (s *DowntimeService) CreateForHost(ctx context.Context, hostID int, req *CreateHostDowntimeRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/downtimes", hostID), req, nil)
 }
 
 // CreateForService schedules a downtime for the given service on a host.
-func (s *DowntimeService) CreateForService(ctx context.Context, hostID, serviceID int, req *CreateDowntimeRequest) error {
+func (s *DowntimeService) CreateForService(ctx context.Context, hostID, serviceID int, req *CreateServiceDowntimeRequest) error {
 	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/downtimes", hostID, serviceID), req, nil)
 }
 
