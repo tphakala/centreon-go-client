@@ -9,7 +9,7 @@ import (
 func TestTimePeriodService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("GET /centreon/api/latest/configuration/time-periods", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /centreon/api/latest/configuration/timeperiods", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"result": []map[string]any{
 				{
@@ -52,7 +52,7 @@ func TestTimePeriodService_List(t *testing.T) {
 func TestTimePeriodService_Get(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("GET /centreon/api/latest/configuration/time-periods/1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /centreon/api/latest/configuration/timeperiods/1", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id":    1,
 			"name":  "24x7",
@@ -102,7 +102,7 @@ func TestTimePeriodService_Get(t *testing.T) {
 func TestTimePeriodService_Create(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("POST /centreon/api/latest/configuration/time-periods", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /centreon/api/latest/configuration/timeperiods", func(w http.ResponseWriter, r *http.Request) {
 		var req CreateTimePeriodRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("decode body: %v", err)
@@ -143,7 +143,7 @@ func TestTimePeriodService_Create(t *testing.T) {
 func TestTimePeriodService_Update(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("PUT /centreon/api/latest/configuration/time-periods/5", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /centreon/api/latest/configuration/timeperiods/5", func(w http.ResponseWriter, r *http.Request) {
 		var req UpdateTimePeriodRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("decode body: %v", err)
@@ -170,7 +170,7 @@ func TestTimePeriodService_Delete(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	var called bool
-	mux.HandleFunc("DELETE /centreon/api/latest/configuration/time-periods/5", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /centreon/api/latest/configuration/timeperiods/5", func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusNoContent)
 	})
