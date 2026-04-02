@@ -94,7 +94,8 @@ type UpdateHostRequest struct {
 	MaxCheckAttempts    *int      `json:"max_check_attempts,omitempty"`
 	NormalCheckInterval *int      `json:"normal_check_interval,omitempty"`
 	RetryCheckInterval  *int      `json:"retry_check_interval,omitempty"`
-	ActiveChecksEnabled *bool     `json:"active_checks_enabled,omitempty"`
+	ActiveCheckEnabled  *int      `json:"active_check_enabled,omitempty"`
+	PassiveCheckEnabled *int      `json:"passive_check_enabled,omitempty"`
 	IsActivated         *bool     `json:"is_activated,omitempty"`
 	SNMPCommunity       *string   `json:"snmp_community,omitempty"`
 	SNMPVersion         *string   `json:"snmp_version,omitempty"`
