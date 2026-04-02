@@ -7,14 +7,32 @@ import (
 	"testing"
 )
 
+func TestNamedRef_JSON(t *testing.T) {
+	orig := NamedRef{ID: 4, Name: "probe-05"}
+
+	data, err := json.Marshal(orig)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	var got NamedRef
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+
+	if got != orig {
+		t.Errorf("round-trip mismatch: got %+v, want %+v", got, orig)
+	}
+}
+
 func TestHostService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, ListResponse[Host]{
 			Result: []Host{
-				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
-				{ID: 2, Name: "host-02", Address: "10.0.0.2", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
+				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServer: NamedRef{ID: 1}, IsActivated: true},
+				{ID: 2, Name: "host-02", Address: "10.0.0.2", MonitoringServer: NamedRef{ID: 1}, IsActivated: true},
 			},
 			Meta: Meta{Page: 1, Limit: 10, Total: 2},
 		})
@@ -44,7 +62,7 @@ func TestHostService_List_WithSearch(t *testing.T) {
 		}
 		writeJSON(w, http.StatusOK, ListResponse[Host]{
 			Result: []Host{
-				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
+				{ID: 1, Name: "host-01", Address: "10.0.0.1", MonitoringServer: NamedRef{ID: 1}, IsActivated: true},
 			},
 			Meta: Meta{Page: 1, Limit: 10, Total: 1},
 		})
@@ -65,7 +83,7 @@ func TestHostService_GetByID_Found(t *testing.T) {
 	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, ListResponse[Host]{
 			Result: []Host{
-				{ID: 42, Name: "host-42", Address: "10.0.0.42", MonitoringServer: MonitoringServerRef{ID: 1}, IsActivated: true},
+				{ID: 42, Name: "host-42", Address: "10.0.0.42", MonitoringServer: NamedRef{ID: 1}, IsActivated: true},
 			},
 			Meta: Meta{Page: 1, Limit: 10, Total: 1},
 		})
