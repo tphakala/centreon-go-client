@@ -24,23 +24,20 @@ type NamedRef struct {
 
 // Host represents a Centreon host configuration resource.
 type Host struct {
-	ID                  int      `json:"id"`
-	MonitoringServer    NamedRef `json:"monitoring_server"`
-	Name                string   `json:"name"`
-	Address             string   `json:"address"`
-	Alias               string   `json:"alias,omitzero"`
-	CheckCommandID      int      `json:"check_command_id,omitzero"`
-	MaxCheckAttempts    int      `json:"max_check_attempts,omitzero"`
-	NormalCheckInterval int      `json:"normal_check_interval,omitzero"`
-	RetryCheckInterval  int      `json:"retry_check_interval,omitzero"`
-	ActiveChecksEnabled *bool    `json:"active_checks_enabled"`
-	IsActivated         bool     `json:"is_activated"`
-	SNMPCommunity       string   `json:"snmp_community,omitzero"`
-	SNMPVersion         string   `json:"snmp_version,omitzero"`
-	TimezoneID          int      `json:"timezone_id,omitzero"`
-	SeverityID          int      `json:"severity_id,omitzero"`
-	Comment             string   `json:"comment,omitzero"`
-	GeoCoords           string   `json:"geo_coords,omitzero"`
+	ID                  int        `json:"id"`
+	MonitoringServer    NamedRef   `json:"monitoring_server"`
+	Name                string     `json:"name"`
+	Address             string     `json:"address"`
+	Alias               string     `json:"alias,omitzero"`
+	NormalCheckInterval *int       `json:"normal_check_interval"`
+	RetryCheckInterval  *int       `json:"retry_check_interval"`
+	CheckTimeperiod     *NamedRef  `json:"check_timeperiod"`
+	NotifTimeperiod     *NamedRef  `json:"notification_timeperiod"`
+	Severity            *NamedRef  `json:"severity"`
+	Templates           []NamedRef `json:"templates,omitzero"`
+	Categories          []NamedRef `json:"categories,omitzero"`
+	Groups              []NamedRef `json:"groups,omitzero"`
+	IsActivated         bool       `json:"is_activated"`
 }
 
 // CreateHostRequest is the request body for creating a host.
