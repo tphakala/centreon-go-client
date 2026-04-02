@@ -46,7 +46,7 @@ type UserFilterService struct {
 // List returns a paginated list of user filters.
 func (s *UserFilterService) List(ctx context.Context, opts ...ListOption) (*ListResponse[UserFilter], error) {
 	var resp ListResponse[UserFilter]
-	err := s.client.list(ctx, "/configuration/users/filters", opts, &resp)
+	err := s.client.list(ctx, "/users/filters/events-view", opts, &resp)
 	return &resp, err
 }
 
@@ -58,7 +58,7 @@ func (s *UserFilterService) All(ctx context.Context, opts ...ListOption) iter.Se
 // Get returns the user filter with the given ID.
 func (s *UserFilterService) Get(ctx context.Context, id int) (*UserFilter, error) {
 	var uf UserFilter
-	if err := s.client.get(ctx, fmt.Sprintf("/configuration/users/filters/%d", id), &uf); err != nil {
+	if err := s.client.get(ctx, fmt.Sprintf("/users/filters/events-view/%d", id), &uf); err != nil {
 		return nil, err
 	}
 	return &uf, nil
@@ -69,7 +69,7 @@ func (s *UserFilterService) Create(ctx context.Context, req CreateUserFilterRequ
 	var result struct {
 		ID int `json:"id"`
 	}
-	if err := s.client.post(ctx, "/configuration/users/filters", req, &result); err != nil {
+	if err := s.client.post(ctx, "/users/filters/events-view", req, &result); err != nil {
 		return 0, err
 	}
 	return result.ID, nil
@@ -77,15 +77,15 @@ func (s *UserFilterService) Create(ctx context.Context, req CreateUserFilterRequ
 
 // Update replaces an existing user filter using PUT.
 func (s *UserFilterService) Update(ctx context.Context, id int, req UpdateUserFilterRequest) error {
-	return s.client.put(ctx, fmt.Sprintf("/configuration/users/filters/%d", id), req)
+	return s.client.put(ctx, fmt.Sprintf("/users/filters/events-view/%d", id), req)
 }
 
 // Patch partially updates an existing user filter using PATCH.
 func (s *UserFilterService) Patch(ctx context.Context, id int, req PatchUserFilterRequest) error {
-	return s.client.patch(ctx, fmt.Sprintf("/configuration/users/filters/%d", id), req)
+	return s.client.patch(ctx, fmt.Sprintf("/users/filters/events-view/%d", id), req)
 }
 
 // Delete deletes a user filter by ID.
 func (s *UserFilterService) Delete(ctx context.Context, id int) error {
-	return s.client.delete(ctx, fmt.Sprintf("/configuration/users/filters/%d", id))
+	return s.client.delete(ctx, fmt.Sprintf("/users/filters/events-view/%d", id))
 }

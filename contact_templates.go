@@ -21,7 +21,7 @@ type ContactTemplateService struct {
 // List returns a paginated list of contact templates.
 func (s *ContactTemplateService) List(ctx context.Context, opts ...ListOption) (*ListResponse[ContactTemplate], error) {
 	var resp ListResponse[ContactTemplate]
-	err := s.client.list(ctx, "/configuration/users/contact-templates", opts, &resp)
+	err := s.client.list(ctx, "/configuration/contacts/templates", opts, &resp)
 	return &resp, err
 }
 

@@ -22,7 +22,7 @@ type ContactGroupService struct {
 // List returns a paginated list of contact groups.
 func (s *ContactGroupService) List(ctx context.Context, opts ...ListOption) (*ListResponse[ContactGroup], error) {
 	var resp ListResponse[ContactGroup]
-	err := s.client.list(ctx, "/configuration/users/contact-groups", opts, &resp)
+	err := s.client.list(ctx, "/configuration/contacts/groups", opts, &resp)
 	return &resp, err
 }
 

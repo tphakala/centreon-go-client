@@ -9,7 +9,7 @@ import (
 func TestUserFilterService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("GET /centreon/api/latest/configuration/users/filters", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /centreon/api/latest/users/filters/events-view", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, ListResponse[UserFilter]{
 			Result: []UserFilter{
 				{ID: 1, Name: "my-filter"},
@@ -34,7 +34,7 @@ func TestUserFilterService_List(t *testing.T) {
 func TestUserFilterService_Get(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("GET /centreon/api/latest/configuration/users/filters/3", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /centreon/api/latest/users/filters/events-view/3", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, UserFilter{
 			ID:   3,
 			Name: "test-filter",
@@ -65,7 +65,7 @@ func TestUserFilterService_Get(t *testing.T) {
 func TestUserFilterService_Create(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("POST /centreon/api/latest/configuration/users/filters", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /centreon/api/latest/users/filters/events-view", func(w http.ResponseWriter, r *http.Request) {
 		var req CreateUserFilterRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode body: %v", err)
@@ -90,7 +90,7 @@ func TestUserFilterService_Create(t *testing.T) {
 func TestUserFilterService_Update(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("PUT /centreon/api/latest/configuration/users/filters/3", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /centreon/api/latest/users/filters/events-view/3", func(w http.ResponseWriter, r *http.Request) {
 		var req UpdateUserFilterRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode body: %v", err)
@@ -110,7 +110,7 @@ func TestUserFilterService_Update(t *testing.T) {
 func TestUserFilterService_Patch(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("PATCH /centreon/api/latest/configuration/users/filters/3", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PATCH /centreon/api/latest/users/filters/events-view/3", func(w http.ResponseWriter, r *http.Request) {
 		var req PatchUserFilterRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode body: %v", err)
@@ -132,7 +132,7 @@ func TestUserFilterService_Delete(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	var called bool
-	mux.HandleFunc("DELETE /centreon/api/latest/configuration/users/filters/3", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /centreon/api/latest/users/filters/events-view/3", func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusNoContent)
 	})

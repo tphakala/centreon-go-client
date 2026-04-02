@@ -3,6 +3,7 @@ package centreon
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -136,6 +137,20 @@ func WithHTTPClient(hc *http.Client) Option {
 // WithTimeout sets the HTTP client timeout. Defaults to 30 seconds.
 func WithTimeout(d time.Duration) Option {
 	return func(c *Client) { c.httpClient.Timeout = d }
+}
+
+// WithInsecureTLS disables TLS certificate verification.
+// Use only for testing against instances with self-signed certificates.
+func WithInsecureTLS() Option {
+	return func(c *Client) {
+		transport, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			return
+		}
+		transport = transport.Clone()
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // intentional for test instances
+		c.httpClient.Transport = transport
+	}
 }
 
 // WithLogger enables structured logging for API requests and errors.

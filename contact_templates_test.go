@@ -8,7 +8,7 @@ import (
 func TestContactTemplateService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	mux.HandleFunc("GET /centreon/api/latest/configuration/users/contact-templates", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /centreon/api/latest/configuration/contacts/templates", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, ListResponse[ContactTemplate]{
 			Result: []ContactTemplate{
 				{ID: 1, Name: "generic-contact", Alias: "Generic Contact", IsActivated: true},
