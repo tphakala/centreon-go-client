@@ -8,11 +8,12 @@ import (
 
 // User represents a Centreon user (contact).
 type User struct {
-	ID      int    `json:"id"`
-	Name    string `json:"name"`
-	Alias   string `json:"alias,omitzero"`
-	Email   string `json:"email,omitzero"`
-	IsAdmin bool   `json:"is_admin"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Alias       string `json:"alias,omitzero"`
+	Email       string `json:"email,omitzero"`
+	IsAdmin     bool   `json:"is_admin"`
+	IsActivated bool   `json:"is_activated,omitzero"`
 }
 
 // UpdateUserRequest is the request body for updating a user (PATCH).
