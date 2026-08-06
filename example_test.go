@@ -122,6 +122,33 @@ func ExampleHostService_Update() {
 	}
 }
 
+func ExampleHostService_Get() {
+	ctx := context.Background()
+	client, _ := centreon.NewClient("https://centreon.example.com",
+		centreon.WithAPIToken("token"),
+	)
+
+	// Get returns the full host configuration including custom macros.
+	// Requires Centreon 25.10 or later; older versions return HTTP 404.
+	host, err := client.Hosts.Get(ctx, 42)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, m := range host.Macros {
+		// Value is nil for password macros, which the API masks on read.
+		if m.IsPassword {
+			fmt.Printf("%s = (password)\n", m.Name)
+			continue
+		}
+		value := ""
+		if m.Value != nil {
+			value = *m.Value
+		}
+		fmt.Printf("%s = %s\n", m.Name, value)
+	}
+}
+
 func ExampleAnd() {
 	// Complex search: prod hosts in a specific address range
 	filter := centreon.And(

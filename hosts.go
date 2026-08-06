@@ -14,6 +14,17 @@ type Macro struct {
 	Description string `json:"description,omitzero"`
 }
 
+// HostMacro is a custom macro as returned by HostService.Get
+// (GET /configuration/hosts/{id}) on Centreon 25.10+. Value is nil when
+// IsPassword is true because the API masks password values on read.
+type HostMacro struct {
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Value       *string `json:"value"`
+	IsPassword  bool    `json:"is_password"`
+	Description string  `json:"description,omitzero"`
+}
+
 // NamedRef is a lightweight reference to a named Centreon resource.
 // The Centreon API uses {"id": N, "name": "..."} objects for relationships
 // such as templates, categories, groups, and monitoring servers.
@@ -38,6 +49,74 @@ type Host struct {
 	Categories          []NamedRef `json:"categories,omitzero"`
 	Groups              []NamedRef `json:"groups,omitzero"`
 	IsActivated         bool       `json:"is_activated"`
+}
+
+// HostDetail is the full host configuration returned by HostService.Get
+// (GET /configuration/hosts/{id}), including custom macros.
+//
+// This endpoint requires Centreon 25.10 or later; earlier versions have no
+// GET route for a single host and return an *APIError with HTTP status 404
+// (use GetByID for a version-independent, macro-free lookup). Unlike Host
+// (the list shape), references other than categories, groups and templates
+// are raw IDs. Per the Centreon 25.10 API, Macros lists only macros defined
+// directly on the host; macros inherited from parent templates or commands
+// are not returned.
+type HostDetail struct {
+	ID                 int    `json:"id"`
+	MonitoringServerID int    `json:"monitoring_server_id"`
+	Name               string `json:"name"`
+	Address            string `json:"address"`
+	Alias              string `json:"alias,omitzero"`
+
+	SNMPVersion   string `json:"snmp_version,omitzero"`
+	SNMPCommunity string `json:"snmp_community,omitzero"`
+
+	GeoCoords  string `json:"geo_coords,omitzero"`
+	TimezoneID *int   `json:"timezone_id"`
+	SeverityID *int   `json:"severity_id"`
+
+	CheckCommandID      *int     `json:"check_command_id"`
+	CheckCommandArgs    []string `json:"check_command_args,omitzero"`
+	CheckTimeperiodID   *int     `json:"check_timeperiod_id"`
+	MaxCheckAttempts    *int     `json:"max_check_attempts"`
+	NormalCheckInterval *int     `json:"normal_check_interval"`
+	RetryCheckInterval  *int     `json:"retry_check_interval"`
+	ActiveCheckEnabled  int      `json:"active_check_enabled"`
+	PassiveCheckEnabled int      `json:"passive_check_enabled"`
+
+	NotificationEnabled       int  `json:"notification_enabled"`
+	NotificationOptions       *int `json:"notification_options"`
+	NotificationInterval      *int `json:"notification_interval"`
+	NotificationTimeperiodID  *int `json:"notification_timeperiod_id"`
+	AddInheritedContactGroup  bool `json:"add_inherited_contact_group"`
+	AddInheritedContact       bool `json:"add_inherited_contact"`
+	FirstNotificationDelay    *int `json:"first_notification_delay"`
+	RecoveryNotificationDelay *int `json:"recovery_notification_delay"`
+	AcknowledgementTimeout    *int `json:"acknowledgement_timeout"`
+
+	FreshnessChecked   int  `json:"freshness_checked"`
+	FreshnessThreshold *int `json:"freshness_threshold"`
+
+	FlapDetectionEnabled int  `json:"flap_detection_enabled"`
+	LowFlapThreshold     *int `json:"low_flap_threshold"`
+	HighFlapThreshold    *int `json:"high_flap_threshold"`
+
+	EventHandlerEnabled     int      `json:"event_handler_enabled"`
+	EventHandlerCommandID   *int     `json:"event_handler_command_id"`
+	EventHandlerCommandArgs []string `json:"event_handler_command_args,omitzero"`
+
+	NoteURL         string `json:"note_url,omitzero"`
+	Note            string `json:"note,omitzero"`
+	ActionURL       string `json:"action_url,omitzero"`
+	IconID          *int   `json:"icon_id"`
+	IconAlternative string `json:"icon_alternative,omitzero"`
+	Comment         string `json:"comment,omitzero"`
+	IsActivated     bool   `json:"is_activated"`
+
+	Categories []NamedRef  `json:"categories,omitzero"`
+	Groups     []NamedRef  `json:"groups,omitzero"`
+	Templates  []NamedRef  `json:"templates,omitzero"`
+	Macros     []HostMacro `json:"macros,omitzero"`
 }
 
 // CreateHostRequest is the request body for creating a host.
@@ -176,6 +255,21 @@ func (s *HostService) All(ctx context.Context, opts ...ListOption) iter.Seq2[*Ho
 // Returns *NotFoundError if not found.
 func (s *HostService) GetByID(ctx context.Context, id int) (*Host, error) {
 	return getByID(ctx, s.List, "host", id)
+}
+
+// Get returns the full configuration of the host with the given ID via a
+// direct GET request, including custom macros defined directly on the host
+// (template- and command-inherited macros are not included).
+//
+// This requires Centreon 25.10 or later; earlier versions return an *APIError
+// with HTTP status 404. For a version-independent lookup of the list
+// representation (without macros), use GetByID.
+func (s *HostService) Get(ctx context.Context, id int) (*HostDetail, error) {
+	var h HostDetail
+	if err := s.client.get(ctx, fmt.Sprintf("/configuration/hosts/%d", id), &h); err != nil {
+		return nil, err
+	}
+	return &h, nil
 }
 
 // Create creates a new host and returns its ID.

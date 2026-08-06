@@ -65,12 +65,12 @@ func main() {
 
 | Resource | List | Get | Create | Update | Delete |
 |----------|------|-----|--------|--------|--------|
-| Hosts | yes | by ID* | yes | PATCH | yes |
+| Hosts | yes | yes** / by ID* | yes | PATCH | yes |
 | Host Groups | yes | yes | yes | PUT | yes |
 | Host Categories | yes | yes | yes | PUT | yes |
 | Host Severities | yes | yes | yes | PUT | yes |
 | Host Templates | yes | by ID* | yes | PATCH | yes |
-| Services | yes | by ID* | yes | PATCH | yes |
+| Services | yes | yes** | yes | PATCH | yes |
 | Service Groups | yes | - | yes | - | yes |
 | Service Categories | yes | - | yes | - | yes |
 | Service Severities | yes | - | yes | PUT | yes |
@@ -80,6 +80,8 @@ func main() {
 | Monitoring Servers | yes | - | - | - | - |
 
 *\* by ID = filtered list lookup (API has no direct GET endpoint)*
+
+*\*\* `Get(ctx, id)` requires Centreon 25.10+ and returns the full configuration including custom macros (hosts: macros defined directly on the host; services: also includes macros inherited from service templates and commands). Earlier versions have no single-resource GET route and return an API error with HTTP status 404: on those versions use `GetByID` for hosts, and `ListByHost` for services (the services endpoint has no by-id lookup).*
 
 ### User & Contact Management
 

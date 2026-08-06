@@ -22,6 +22,81 @@ type Service struct {
 	IsActivated         bool       `json:"is_activated"`
 }
 
+// ServiceMacro is a custom macro as returned by ServiceService.Get
+// (GET /configuration/services/{id}) on Centreon 25.10+. Unlike HostMacro it
+// carries no ID. Value is nil when IsPassword is true because the API masks
+// password values on read.
+type ServiceMacro struct {
+	Name        string  `json:"name"`
+	Value       *string `json:"value"`
+	IsPassword  bool    `json:"is_password"`
+	Description string  `json:"description,omitzero"`
+}
+
+// ServiceDetail is the full service configuration returned by
+// ServiceService.Get (GET /configuration/services/{id}), including custom
+// macros.
+//
+// This endpoint requires Centreon 25.10 or later; earlier versions have no
+// GET route for a single service and return an *APIError with HTTP status
+// 404. Unlike Service (the list shape), references other than categories and
+// groups are raw IDs. Per the Centreon 25.10 API, Macros includes macros
+// inherited from service templates and commands in addition to those defined
+// on the service itself.
+type ServiceDetail struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	HostID    int    `json:"host_id"`
+	GeoCoords string `json:"geo_coords,omitzero"`
+	Comment   string `json:"comment,omitzero"`
+
+	ServiceTemplateID *int `json:"service_template_id"`
+
+	CheckCommandID      *int     `json:"check_command_id"`
+	CheckCommandArgs    []string `json:"check_command_args,omitzero"`
+	CheckTimeperiodID   *int     `json:"check_timeperiod_id"`
+	MaxCheckAttempts    *int     `json:"max_check_attempts"`
+	NormalCheckInterval *int     `json:"normal_check_interval"`
+	RetryCheckInterval  *int     `json:"retry_check_interval"`
+	ActiveCheckEnabled  int      `json:"active_check_enabled"`
+	PassiveCheckEnabled int      `json:"passive_check_enabled"`
+	VolatilityEnabled   int      `json:"volatility_enabled"`
+
+	NotificationEnabled               int  `json:"notification_enabled"`
+	IsContactAdditiveInheritance      bool `json:"is_contact_additive_inheritance"`
+	IsContactGroupAdditiveInheritance bool `json:"is_contact_group_additive_inheritance"`
+	NotificationInterval              *int `json:"notification_interval"`
+	NotificationTimeperiodID          *int `json:"notification_timeperiod_id"`
+	NotificationType                  *int `json:"notification_type"`
+	FirstNotificationDelay            *int `json:"first_notification_delay"`
+	RecoveryNotificationDelay         *int `json:"recovery_notification_delay"`
+	AcknowledgementTimeout            *int `json:"acknowledgement_timeout"`
+
+	FreshnessChecked   int  `json:"freshness_checked"`
+	FreshnessThreshold *int `json:"freshness_threshold"`
+
+	FlapDetectionEnabled int  `json:"flap_detection_enabled"`
+	LowFlapThreshold     *int `json:"low_flap_threshold"`
+	HighFlapThreshold    *int `json:"high_flap_threshold"`
+
+	EventHandlerEnabled     int      `json:"event_handler_enabled"`
+	EventHandlerCommandID   *int     `json:"event_handler_command_id"`
+	EventHandlerCommandArgs []string `json:"event_handler_command_args,omitzero"`
+
+	GraphTemplateID *int   `json:"graph_template_id"`
+	Note            string `json:"note,omitzero"`
+	NoteURL         string `json:"note_url,omitzero"`
+	ActionURL       string `json:"action_url,omitzero"`
+	IconID          *int   `json:"icon_id"`
+	IconAlternative string `json:"icon_alternative,omitzero"`
+	SeverityID      *int   `json:"severity_id"`
+	IsActivated     bool   `json:"is_activated"`
+
+	Categories []NamedRef     `json:"categories,omitzero"`
+	Groups     []NamedRef     `json:"groups,omitzero"`
+	Macros     []ServiceMacro `json:"macros,omitzero"`
+}
+
 // CreateServiceRequest is the request body for creating a service.
 type CreateServiceRequest struct {
 	// Required
@@ -150,6 +225,21 @@ func (s *ServiceService) All(ctx context.Context, opts ...ListOption) iter.Seq2[
 func (s *ServiceService) ListByHost(ctx context.Context, hostID int, opts ...ListOption) (*ListResponse[Service], error) {
 	opts = append(opts, WithSearch(Eq("host.id", hostID)))
 	return s.List(ctx, opts...)
+}
+
+// Get returns the full configuration of the service with the given ID via a
+// direct GET request, including custom macros. Per the Centreon 25.10 API,
+// the returned macros also include those inherited from service templates and
+// commands.
+//
+// This requires Centreon 25.10 or later; earlier versions return an *APIError
+// with HTTP status 404.
+func (s *ServiceService) Get(ctx context.Context, id int) (*ServiceDetail, error) {
+	var svc ServiceDetail
+	if err := s.client.get(ctx, fmt.Sprintf("/configuration/services/%d", id), &svc); err != nil {
+		return nil, err
+	}
+	return &svc, nil
 }
 
 // Create creates a new service and returns its ID.

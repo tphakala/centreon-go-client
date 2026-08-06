@@ -2,6 +2,7 @@ package centreon
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 )
@@ -272,5 +273,133 @@ func TestServiceService_Update_WithRelationshipFields(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Update: %v", err)
+	}
+}
+
+// realisticServiceDetailJSON returns a full GET /configuration/services/{id}
+// detail payload (Centreon 25.10+) for service 7 on host 42, exercising
+// nullable fields and both a plain and a password (null-value) macro. Note the
+// service macro shape has no "id" key, unlike the host macro shape.
+func realisticServiceDetailJSON() map[string]any {
+	return map[string]any{
+		"id":                                    7,
+		"name":                                  "service-07",
+		"host_id":                               42,
+		"geo_coords":                            "",
+		"comment":                               "",
+		"service_template_id":                   12,
+		"check_command_id":                      nil,
+		"check_command_args":                    []string{"80", "90"},
+		"check_timeperiod_id":                   nil,
+		"max_check_attempts":                    3,
+		"normal_check_interval":                 nil,
+		"retry_check_interval":                  nil,
+		"active_check_enabled":                  2,
+		"passive_check_enabled":                 2,
+		"volatility_enabled":                    2,
+		"notification_enabled":                  2,
+		"is_contact_additive_inheritance":       false,
+		"is_contact_group_additive_inheritance": false,
+		"notification_interval":                 nil,
+		"notification_timeperiod_id":            1,
+		"notification_type":                     nil,
+		"first_notification_delay":              nil,
+		"recovery_notification_delay":           nil,
+		"acknowledgement_timeout":               nil,
+		"freshness_checked":                     2,
+		"freshness_threshold":                   nil,
+		"flap_detection_enabled":                2,
+		"low_flap_threshold":                    nil,
+		"high_flap_threshold":                   nil,
+		"event_handler_enabled":                 2,
+		"event_handler_command_id":              nil,
+		"event_handler_command_args":            []string{},
+		"graph_template_id":                     nil,
+		"note":                                  "",
+		"note_url":                              "",
+		"action_url":                            "",
+		"icon_id":                               nil,
+		"icon_alternative":                      "",
+		"severity_id":                           nil,
+		"is_activated":                          true,
+		"categories":                            []map[string]any{{"id": 1, "name": "svc-cat"}},
+		"groups":                                []map[string]any{{"id": 2, "name": "svc-grp"}},
+		"macros": []map[string]any{
+			{"name": "USER1", "value": "/usr/lib/nagios/plugins", "is_password": false, "description": "plugin path"},
+			{"name": "SERVICEPASSWORD", "value": nil, "is_password": true, "description": nil},
+		},
+	}
+}
+
+func TestServiceService_Get(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/7", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, realisticServiceDetailJSON())
+	})
+
+	svc, err := c.Services.Get(t.Context(), 7)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if svc.ID != 7 {
+		t.Errorf("ID = %d, want 7", svc.ID)
+	}
+	if svc.HostID != 42 {
+		t.Errorf("HostID = %d, want 42", svc.HostID)
+	}
+	if svc.ServiceTemplateID == nil || *svc.ServiceTemplateID != 12 {
+		t.Errorf("ServiceTemplateID = %v, want 12", svc.ServiceTemplateID)
+	}
+	if svc.CheckCommandID != nil {
+		t.Errorf("CheckCommandID = %v, want nil", svc.CheckCommandID)
+	}
+
+	t.Run("macros", func(t *testing.T) {
+		if len(svc.Macros) != 2 {
+			t.Fatalf("len(Macros) = %d, want 2", len(svc.Macros))
+		}
+		if svc.Macros[0].Name != "USER1" {
+			t.Errorf("Macros[0].Name = %q, want USER1", svc.Macros[0].Name)
+		}
+		if svc.Macros[0].Value == nil || *svc.Macros[0].Value != "/usr/lib/nagios/plugins" {
+			t.Errorf("Macros[0].Value = %v, want plugin path", svc.Macros[0].Value)
+		}
+	})
+
+	t.Run("password_macro_null_value", func(t *testing.T) {
+		if len(svc.Macros) != 2 {
+			t.Fatalf("len(Macros) = %d, want 2", len(svc.Macros))
+		}
+		pw := svc.Macros[1]
+		if !pw.IsPassword {
+			t.Errorf("Macros[1].IsPassword = false, want true")
+		}
+		if pw.Value != nil {
+			t.Errorf("Macros[1].Value = %q, want nil (password masked)", *pw.Value)
+		}
+	})
+}
+
+func TestServiceService_Get_NotFound(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/999", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"code": 404, "message": "Service not found"})
+	})
+
+	svc, err := c.Services.Get(t.Context(), 999)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if svc != nil {
+		t.Errorf("expected nil service, got %+v", svc)
+	}
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T: %v", err, err)
+	}
+	if apiErr.HTTPStatus != 404 {
+		t.Errorf("APIError.HTTPStatus = %d, want 404", apiErr.HTTPStatus)
 	}
 }
