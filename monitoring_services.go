@@ -2,6 +2,7 @@ package centreon
 
 import (
 	"context"
+	"fmt"
 	"iter"
 )
 
@@ -40,6 +41,21 @@ type ServiceStatusCount struct {
 	Total    int         `json:"total"`
 }
 
+// Metric is a performance metric of a service, as returned by
+// GET /monitoring/hosts/{host_id}/services/{service_id}/metrics.
+// Pointer fields are nil when the API returns JSON null, which is
+// common for thresholds that are not configured on the metric.
+type Metric struct {
+	ID                    int      `json:"id"`
+	Name                  string   `json:"name"`
+	Unit                  string   `json:"unit"`
+	CurrentValue          *float64 `json:"current_value"`
+	WarningHighThreshold  *float64 `json:"warning_high_threshold"`
+	WarningLowThreshold   *float64 `json:"warning_low_threshold"`
+	CriticalHighThreshold *float64 `json:"critical_high_threshold"`
+	CriticalLowThreshold  *float64 `json:"critical_low_threshold"`
+}
+
 // MonitoringServiceService provides access to the monitoring services endpoints.
 type MonitoringServiceService struct {
 	client *Client
@@ -64,4 +80,22 @@ func (s *MonitoringServiceService) StatusCounts(ctx context.Context) (*ServiceSt
 		return nil, err
 	}
 	return &result, nil
+}
+
+// Timeline returns a paginated list of timeline events for a given service on a host.
+func (s *MonitoringServiceService) Timeline(ctx context.Context, hostID, serviceID int, opts ...ListOption) (*ListResponse[TimelineEvent], error) {
+	var resp ListResponse[TimelineEvent]
+	err := s.client.list(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/timeline", hostID, serviceID), opts, &resp)
+	return &resp, err
+}
+
+// Metrics returns the performance metrics for a given service on a host.
+// The endpoint returns a plain JSON array, so there is no pagination and
+// no ListOption support.
+func (s *MonitoringServiceService) Metrics(ctx context.Context, hostID, serviceID int) ([]Metric, error) {
+	var result []Metric
+	if err := s.client.get(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/metrics", hostID, serviceID), &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

@@ -98,7 +98,7 @@ func main() {
 |----------|---------|
 | Unified Resources | List, GetHost, GetService |
 | Monitoring Hosts | List, Get, StatusCounts, Services, Timeline |
-| Monitoring Services | List, StatusCounts |
+| Monitoring Services | List, StatusCounts, Timeline, Metrics |
 | Downtimes | List, Get, Cancel, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
 | Acknowledgements | List, Get, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
 | Notification Policies | GetForHost, GetForService |
@@ -221,13 +221,13 @@ resp, err := client.Hosts.List(ctx, centreon.WithSearch(filter))
 The API uses two update methods depending on the resource:
 
 ```go
-// PATCH (partial update) — hosts, services, templates
+// PATCH (partial update): hosts, services, templates
 // Only specified fields are changed. Use pointer fields.
 err := client.Hosts.Update(ctx, hostID, centreon.UpdateHostRequest{
     Alias: new("updated alias"),  // Go 1.26 new(expr)
 })
 
-// PUT (full replacement) — groups, categories, severities, time periods
+// PUT (full replacement): groups, categories, severities, time periods
 // All fields are sent. Omitted fields reset to defaults.
 err := client.HostGroups.Update(ctx, groupID, centreon.UpdateHostGroupRequest{
     Name:  "linux-servers",
@@ -299,4 +299,4 @@ client, _ := centreon.NewClient(url, centreon.WithVersion("v24.04"))
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE) for details.
+Apache License 2.0. See [LICENSE](LICENSE) for details.
