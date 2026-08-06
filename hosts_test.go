@@ -416,3 +416,150 @@ func TestHostService_Update_WithRelationshipFields(t *testing.T) {
 		t.Fatalf("Update: %v", err)
 	}
 }
+
+// realisticHostDetailJSON returns a full GET /configuration/hosts/{id} detail
+// payload (Centreon 25.10+) for host 42, exercising nullable fields and both a
+// plain and a password (null-value) macro.
+func realisticHostDetailJSON() map[string]any {
+	return map[string]any{
+		"id":                          42,
+		"monitoring_server_id":        4,
+		"name":                        "host-42",
+		"address":                     "10.0.0.42",
+		"alias":                       "Host 42",
+		"snmp_version":                "2c",
+		"snmp_community":              "public",
+		"geo_coords":                  "48.10,12.5",
+		"timezone_id":                 nil,
+		"severity_id":                 1,
+		"check_command_id":            1,
+		"check_command_args":          []string{"0", "OK"},
+		"check_timeperiod_id":         nil,
+		"max_check_attempts":          3,
+		"normal_check_interval":       5,
+		"retry_check_interval":        1,
+		"active_check_enabled":        2,
+		"passive_check_enabled":       2,
+		"notification_enabled":        2,
+		"notification_options":        nil,
+		"notification_interval":       nil,
+		"notification_timeperiod_id":  1,
+		"add_inherited_contact_group": false,
+		"add_inherited_contact":       false,
+		"first_notification_delay":    nil,
+		"recovery_notification_delay": nil,
+		"acknowledgement_timeout":     nil,
+		"freshness_checked":           0,
+		"freshness_threshold":         nil,
+		"flap_detection_enabled":      0,
+		"low_flap_threshold":          nil,
+		"high_flap_threshold":         nil,
+		"event_handler_enabled":       0,
+		"event_handler_command_id":    nil,
+		"event_handler_command_args":  []string{},
+		"note_url":                    "",
+		"note":                        "",
+		"action_url":                  "",
+		"icon_id":                     nil,
+		"icon_alternative":            "",
+		"comment":                     "",
+		"is_activated":                true,
+		"categories":                  []map[string]any{{"id": 29, "name": "Managed_VPN"}},
+		"groups":                      []map[string]any{{"id": 1310, "name": "test-group"}},
+		"templates":                   []map[string]any{{"id": 684, "name": "Ping_only"}},
+		"macros": []map[string]any{
+			{"id": 101, "name": "WARNINGTHRESHOLD", "value": "80", "is_password": false, "description": "warn level"},
+			{"id": 102, "name": "SNMPPASSWORD", "value": nil, "is_password": true, "description": nil},
+		},
+	}
+}
+
+func TestHostService_Get(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts/42", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, realisticHostDetailJSON())
+	})
+
+	h, err := c.Hosts.Get(t.Context(), 42)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if h.ID != 42 {
+		t.Errorf("ID = %d, want 42", h.ID)
+	}
+	if h.MonitoringServerID != 4 {
+		t.Errorf("MonitoringServerID = %d, want 4", h.MonitoringServerID)
+	}
+	if h.CheckTimeperiodID != nil {
+		t.Errorf("CheckTimeperiodID = %v, want nil", h.CheckTimeperiodID)
+	}
+	if h.MaxCheckAttempts == nil || *h.MaxCheckAttempts != 3 {
+		t.Errorf("MaxCheckAttempts = %v, want 3", h.MaxCheckAttempts)
+	}
+	if len(h.Templates) != 1 || h.Templates[0].ID != 684 {
+		t.Errorf("Templates = %+v, want [{ID:684 ...}]", h.Templates)
+	}
+
+	checkHostDetailMacros(t, h.Macros)
+}
+
+// checkHostDetailMacros verifies the plain and password macros decoded from a
+// host detail response, including the nil Value on a masked password macro.
+func checkHostDetailMacros(t *testing.T, macros []HostMacro) {
+	t.Helper()
+
+	t.Run("macros", func(t *testing.T) {
+		if len(macros) != 2 {
+			t.Fatalf("len(Macros) = %d, want 2", len(macros))
+		}
+		if macros[0].ID != 101 {
+			t.Errorf("Macros[0].ID = %d, want 101", macros[0].ID)
+		}
+		if macros[0].Value == nil || *macros[0].Value != "80" {
+			t.Errorf("Macros[0].Value = %v, want \"80\"", macros[0].Value)
+		}
+		if macros[0].Description != "warn level" {
+			t.Errorf("Macros[0].Description = %q, want %q", macros[0].Description, "warn level")
+		}
+	})
+
+	t.Run("password_macro_null_value", func(t *testing.T) {
+		if len(macros) != 2 {
+			t.Fatalf("len(Macros) = %d, want 2", len(macros))
+		}
+		pw := macros[1]
+		if !pw.IsPassword {
+			t.Errorf("Macros[1].IsPassword = false, want true")
+		}
+		if pw.Value != nil {
+			t.Errorf("Macros[1].Value = %q, want nil (password masked)", *pw.Value)
+		}
+		if pw.Description != "" {
+			t.Errorf("Macros[1].Description = %q, want empty", pw.Description)
+		}
+	})
+}
+
+func TestHostService_Get_NotFound(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/hosts/999", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"code": 404, "message": "Host not found"})
+	})
+
+	h, err := c.Hosts.Get(t.Context(), 999)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if h != nil {
+		t.Errorf("expected nil host, got %+v", h)
+	}
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T: %v", err, err)
+	}
+	if apiErr.HTTPStatus != 404 {
+		t.Errorf("APIError.HTTPStatus = %d, want 404", apiErr.HTTPStatus)
+	}
+}
