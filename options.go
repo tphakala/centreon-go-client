@@ -30,6 +30,19 @@ type ListOptions struct {
 	Limit  int
 	Search Filter
 	SortBy map[string]string
+
+	// ArrayFilters holds dedicated name-based array query parameters for the
+	// /monitoring/resources listing (statuses, types, host/service group and
+	// category names, monitoring-server names, states). Centreon parses these
+	// as a scalar param whose value is a JSON-encoded array, for example
+	// statuses=["OK","WARNING"], which the search DSL cannot express. Each key
+	// maps to the values sent for it. queryParams JSON-encodes each entry.
+	// These are only meaningful for /monitoring/resources; setting them on
+	// another list endpoint sends parameters that endpoint does not define.
+	// Param names and wire format verified against centreon-web
+	// FindResourcesRequestValidator.php; not yet confirmed against a live 25.10
+	// instance.
+	ArrayFilters map[string][]string
 }
 
 // ListOption is a functional option for list requests.
@@ -53,6 +66,27 @@ func WithSearch(f Filter) ListOption {
 // WithSort sets the sort order.
 func WithSort(sortBy map[string]string) ListOption {
 	return func(o *ListOptions) { o.SortBy = sortBy }
+}
+
+// WithArrayFilter adds a dedicated name-based array filter for the
+// /monitoring/resources listing. Values accumulate across calls with the
+// same key. Centreon sends these as statuses=["OK","WARNING"] (a scalar
+// param holding a JSON array), so they cannot be expressed via WithSearch.
+// Prefer the typed helpers (WithStatuses, WithResourceTypes, ...) for known
+// filters; use this for filters the typed helpers do not cover. Applies to
+// /monitoring/resources only. Do not pass a reserved key (page, limit, search,
+// sort_by); those are owned by WithPage/WithLimit/WithSearch/WithSort, and a
+// colliding array filter would override the value they set.
+func WithArrayFilter(key string, values ...string) ListOption {
+	return func(o *ListOptions) {
+		if len(values) == 0 {
+			return
+		}
+		if o.ArrayFilters == nil {
+			o.ArrayFilters = make(map[string][]string)
+		}
+		o.ArrayFilters[key] = append(o.ArrayFilters[key], values...)
+	}
 }
 
 // applyOptions applies functional options to a ListOptions struct.
@@ -86,6 +120,18 @@ func (o *ListOptions) queryParams() (url.Values, error) {
 			return nil, fmt.Errorf("centreon: marshal sort_by: %w", err)
 		}
 		q.Set("sort_by", string(data))
+	}
+	// url.Values.Encode sorts keys when the query string is built, so the
+	// emitted order is already deterministic; no need to sort here.
+	for k, vals := range o.ArrayFilters {
+		if len(vals) == 0 {
+			continue
+		}
+		data, err := json.Marshal(vals)
+		if err != nil {
+			return nil, fmt.Errorf("centreon: marshal array filter %q: %w", k, err)
+		}
+		q.Set(k, string(data))
 	}
 	return q, nil
 }

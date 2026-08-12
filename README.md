@@ -216,6 +216,36 @@ resp, err := client.Hosts.List(ctx, centreon.WithSearch(filter))
 
 **Available operators:** `Eq`, `Neq`, `Lt`, `Le`, `Gt`, `Ge`, `Lk` (like), `Nk` (not like), `In`, `Ni` (not in), `Rg` (regex)
 
+## Resource Status Filters
+
+The unified `/monitoring/resources` listing (`client.Monitoring.List` / `client.Monitoring.All`) accepts dedicated name-based array filters that the numeric search DSL cannot express. Combine them freely; each is sent as a scalar query parameter whose value is a JSON-encoded array (for example `statuses=["OK","WARNING"]`).
+
+```go
+resp, err := client.Monitoring.List(ctx,
+    centreon.WithResourceTypes("host", "service"),
+    centreon.WithStatuses("DOWN", "CRITICAL", "UNKNOWN"),
+    centreon.WithHostGroupNames("ESX-Paris"),
+)
+```
+
+Prefer these name-based filters over the numeric status codes exposed by the search DSL: the codes collide across resource kinds, whereas the names do not. A host `DOWN` and a service `WARNING` share status code `1`, and a host `UNREACHABLE` and a service `CRITICAL` share code `2`, so a numeric `status_code` filter cannot tell them apart. `WithStatuses("DOWN")` selects exactly the down hosts.
+
+| Helper | Query parameter | Allowed values |
+|--------|-----------------|----------------|
+| `WithResourceTypes` | `types` | `host`, `service`, `metaservice` |
+| `WithStatuses` | `statuses` | `OK`, `UP`, `WARNING`, `DOWN`, `CRITICAL`, `UNREACHABLE`, `UNKNOWN`, `PENDING` |
+| `WithStatusTypes` | `status_types` | `hard`, `soft` |
+| `WithStates` | `states` | `unhandled_problems`, `resources_problems`, `in_downtime`, `acknowledged`, `in_flapping`, `all` |
+| `WithHostGroupNames` | `hostgroup_names` | host group names |
+| `WithServiceGroupNames` | `servicegroup_names` | service group names |
+| `WithHostCategoryNames` | `host_category_names` | host category names |
+| `WithServiceCategoryNames` | `service_category_names` | service category names |
+| `WithMonitoringServerNames` | `monitoring_server_names` | monitoring server (poller) names |
+
+Repeated calls to the same helper accumulate values. For any filter these helpers do not cover, use the general escape hatch `WithArrayFilter(key string, values ...string)`, which emits the same JSON-scalar wire format under an arbitrary key.
+
+The parameter names and wire format were verified against the centreon-web `FindResourcesRequestValidator.php` source, not yet against a live 25.10 instance.
+
 ## Update Patterns
 
 The API uses two update methods depending on the resource:

@@ -75,3 +75,76 @@ func (s *MonitoringResourceService) GetService(ctx context.Context, hostID, serv
 	}
 	return &result, nil
 }
+
+// WithResourceTypes filters the /monitoring/resources listing by resource type.
+// It emits the "types" query parameter. Allowed values: host, service,
+// metaservice. Verified against centreon-web FindResourcesRequestValidator.php
+// source, not yet against a live instance.
+func WithResourceTypes(types ...string) ListOption {
+	return WithArrayFilter("types", types...)
+}
+
+// WithStatuses filters the /monitoring/resources listing by status. It emits the
+// "statuses" query parameter. Allowed values: OK, UP, WARNING, DOWN, CRITICAL,
+// UNREACHABLE, UNKNOWN, PENDING. Verified against centreon-web
+// FindResourcesRequestValidator.php source, not yet against a live instance.
+func WithStatuses(statuses ...string) ListOption {
+	return WithArrayFilter("statuses", statuses...)
+}
+
+// WithStatusTypes filters the /monitoring/resources listing by status type. It
+// emits the "status_types" query parameter. Allowed values: hard, soft.
+// Verified against centreon-web FindResourcesRequestValidator.php source, not
+// yet against a live instance.
+func WithStatusTypes(statusTypes ...string) ListOption {
+	return WithArrayFilter("status_types", statusTypes...)
+}
+
+// WithStates filters the /monitoring/resources listing by state. It emits the
+// "states" query parameter. Allowed values: unhandled_problems,
+// resources_problems, in_downtime, acknowledged, in_flapping, all. Verified
+// against centreon-web FindResourcesRequestValidator.php source, not yet against
+// a live instance.
+func WithStates(states ...string) ListOption {
+	return WithArrayFilter("states", states...)
+}
+
+// WithHostGroupNames filters the /monitoring/resources listing by host group
+// name. It emits the "hostgroup_names" query parameter. Verified against
+// centreon-web FindResourcesRequestValidator.php source, not yet against a live
+// instance.
+func WithHostGroupNames(names ...string) ListOption {
+	return WithArrayFilter("hostgroup_names", names...)
+}
+
+// WithServiceGroupNames filters the /monitoring/resources listing by service
+// group name. It emits the "servicegroup_names" query parameter. Verified
+// against centreon-web FindResourcesRequestValidator.php source, not yet against
+// a live instance.
+func WithServiceGroupNames(names ...string) ListOption {
+	return WithArrayFilter("servicegroup_names", names...)
+}
+
+// WithHostCategoryNames filters the /monitoring/resources listing by host
+// category name. It emits the "host_category_names" query parameter. Verified
+// against centreon-web FindResourcesRequestValidator.php source, not yet against
+// a live instance.
+func WithHostCategoryNames(names ...string) ListOption {
+	return WithArrayFilter("host_category_names", names...)
+}
+
+// WithServiceCategoryNames filters the /monitoring/resources listing by service
+// category name. It emits the "service_category_names" query parameter. Verified
+// against centreon-web FindResourcesRequestValidator.php source, not yet against
+// a live instance.
+func WithServiceCategoryNames(names ...string) ListOption {
+	return WithArrayFilter("service_category_names", names...)
+}
+
+// WithMonitoringServerNames filters the /monitoring/resources listing by
+// monitoring server (poller) name. It emits the "monitoring_server_names" query
+// parameter. Verified against centreon-web FindResourcesRequestValidator.php
+// source, not yet against a live instance.
+func WithMonitoringServerNames(names ...string) ListOption {
+	return WithArrayFilter("monitoring_server_names", names...)
+}

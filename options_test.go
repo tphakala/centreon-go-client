@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"testing"
 )
 
@@ -306,5 +307,75 @@ func TestAll_BreakEarly(t *testing.T) {
 	// Should have stopped after 2 pages, not fetched all 100
 	if callCount > 3 {
 		t.Errorf("handler called %d times, expected at most 3", callCount)
+	}
+}
+
+func TestQueryParams_ArrayFilter_JSONScalar(t *testing.T) {
+	opts := &ListOptions{ArrayFilters: map[string][]string{"statuses": {"OK", "WARNING"}}}
+	q, err := opts.queryParams()
+	if err != nil {
+		t.Fatalf("queryParams: %v", err)
+	}
+	got := q.Get("statuses")
+	want := `["OK","WARNING"]`
+	if got != want {
+		t.Errorf("statuses = %q, want %q", got, want)
+	}
+	// The wire format is a scalar param holding a JSON array, never the bracketed
+	// repeated form; assert the bracketed key never appears.
+	if _, ok := q["statuses[]"]; ok {
+		t.Errorf("unexpected bracketed key statuses[] present: %v", q)
+	}
+}
+
+func TestQueryParams_ArrayFilter_Multi(t *testing.T) {
+	opts := &ListOptions{ArrayFilters: map[string][]string{
+		"types":           {"host"},
+		"hostgroup_names": {"ESX-Paris", "ESX-Lyon"},
+	}}
+	q, err := opts.queryParams()
+	if err != nil {
+		t.Fatalf("queryParams: %v", err)
+	}
+	if got, want := q.Get("types"), `["host"]`; got != want {
+		t.Errorf("types = %q, want %q", got, want)
+	}
+	if got, want := q.Get("hostgroup_names"), `["ESX-Paris","ESX-Lyon"]`; got != want {
+		t.Errorf("hostgroup_names = %q, want %q", got, want)
+	}
+	// url.Values.Encode sorts keys, so the output is deterministic across runs
+	// (hostgroup_names sorts before types).
+	want := url.Values{
+		"hostgroup_names": {`["ESX-Paris","ESX-Lyon"]`},
+		"types":           {`["host"]`},
+	}.Encode()
+	if got := q.Encode(); got != want {
+		t.Errorf("Encode() = %q, want %q", got, want)
+	}
+}
+
+func TestQueryParams_ArrayFilter_EmptySkipped(t *testing.T) {
+	opts := &ListOptions{ArrayFilters: map[string][]string{"statuses": {}}}
+	q, err := opts.queryParams()
+	if err != nil {
+		t.Fatalf("queryParams: %v", err)
+	}
+	if _, ok := q["statuses"]; ok {
+		t.Errorf("statuses key present for empty slice: %v", q)
+	}
+}
+
+func TestWithArrayFilter_Accumulate(t *testing.T) {
+	opts := &ListOptions{}
+	WithArrayFilter("statuses", "OK")(opts)
+	WithArrayFilter("statuses", "WARNING", "CRITICAL")(opts)
+	wantStrSlice(t, `ArrayFilters["statuses"]`, opts.ArrayFilters["statuses"], []string{"OK", "WARNING", "CRITICAL"})
+}
+
+func TestWithArrayFilter_EmptyNoop(t *testing.T) {
+	opts := &ListOptions{}
+	WithArrayFilter("statuses")(opts)
+	if opts.ArrayFilters != nil {
+		t.Errorf("ArrayFilters = %v, want nil (empty values must be a no-op)", opts.ArrayFilters)
 	}
 }

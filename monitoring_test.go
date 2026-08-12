@@ -3,6 +3,7 @@ package centreon
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"testing"
 )
 
@@ -313,4 +314,67 @@ func TestMonitoringResource_RoundTrip(t *testing.T) {
 		LastStatusChange:    "2026-03-27T15:44:27+02:00",
 		NotificationEnabled: true,
 	})
+}
+
+// TestTypedResourceFilters covers every typed /monitoring/resources array-filter
+// helper: each must accumulate its values under the exact query-param key
+// Centreon expects.
+func TestTypedResourceFilters(t *testing.T) {
+	cases := []struct {
+		name    string
+		option  ListOption
+		wantKey string
+		wantVal []string
+	}{
+		{"WithResourceTypes", WithResourceTypes("host", "service"), "types", []string{"host", "service"}},
+		{"WithStatuses", WithStatuses("OK", "WARNING"), "statuses", []string{"OK", "WARNING"}},
+		{"WithStatusTypes", WithStatusTypes("hard"), "status_types", []string{"hard"}},
+		{"WithStates", WithStates("unhandled_problems"), "states", []string{"unhandled_problems"}},
+		{"WithHostGroupNames", WithHostGroupNames("ESX-Paris"), "hostgroup_names", []string{"ESX-Paris"}},
+		{"WithServiceGroupNames", WithServiceGroupNames("SG-Web"), "servicegroup_names", []string{"SG-Web"}},
+		{"WithHostCategoryNames", WithHostCategoryNames("Linux"), "host_category_names", []string{"Linux"}},
+		{"WithServiceCategoryNames", WithServiceCategoryNames("Ping"), "service_category_names", []string{"Ping"}},
+		{"WithMonitoringServerNames", WithMonitoringServerNames("Central"), "monitoring_server_names", []string{"Central"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := &ListOptions{}
+			tc.option(opts)
+			if len(opts.ArrayFilters) != 1 {
+				t.Fatalf("ArrayFilters has %d keys, want exactly 1: %v", len(opts.ArrayFilters), opts.ArrayFilters)
+			}
+			wantStrSlice(t, tc.wantKey, opts.ArrayFilters[tc.wantKey], tc.wantVal)
+		})
+	}
+}
+
+// TestMonitoringList_ArrayFilterOnWire confirms a typed filter reaches the wire
+// as a JSON-scalar query param through List -> queryParams -> get.
+func TestMonitoringList_ArrayFilterOnWire(t *testing.T) {
+	mux, c := newTestMux(t)
+	var gotQuery string
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/resources", func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []MonitoringResource{},
+			"meta":   map[string]any{"page": 1, "limit": 10, "total": 0},
+		})
+	})
+
+	_, err := c.Monitoring.List(t.Context(), WithStatuses("OK", "WARNING"), WithResourceTypes("host"))
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+
+	// RawQuery is percent-encoded; decode before asserting on the JSON payload.
+	vals, err := url.ParseQuery(gotQuery)
+	if err != nil {
+		t.Fatalf("ParseQuery(%q): %v", gotQuery, err)
+	}
+	if got, want := vals.Get("statuses"), `["OK","WARNING"]`; got != want {
+		t.Errorf("statuses = %q, want %q", got, want)
+	}
+	if got, want := vals.Get("types"), `["host"]`; got != want {
+		t.Errorf("types = %q, want %q", got, want)
+	}
 }
