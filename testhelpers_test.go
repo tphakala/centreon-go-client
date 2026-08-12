@@ -1,9 +1,14 @@
 package centreon
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"slices"
+	"sync"
 	"testing"
 )
 
@@ -34,4 +39,127 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v) //nolint:errchkjson // test helper
+}
+
+// logLine is a captured log record reduced to the fields tests assert on, so
+// the heavy slog.Record is not copied around after capture.
+type logLine struct {
+	level slog.Level
+	msg   string
+	attrs map[string]string
+}
+
+// recordingHandler is a minimal slog.Handler that captures emitted records so
+// tests can assert on level, message, and individual attributes.
+type recordingHandler struct {
+	mu    sync.Mutex
+	lines []logLine
+}
+
+func (h *recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+//nolint:gocritic // slog.Handler.Handle requires slog.Record by value.
+func (h *recordingHandler) Handle(_ context.Context, r slog.Record) error {
+	line := logLine{level: r.Level, msg: r.Message, attrs: make(map[string]string, r.NumAttrs())}
+	r.Attrs(func(a slog.Attr) bool {
+		line.attrs[a.Key] = a.Value.String()
+		return true
+	})
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.lines = append(h.lines, line)
+	return nil
+}
+
+// WithAttrs and WithGroup return the same handler unchanged: the client logs
+// via Debug/Error directly and never derives a sub-logger, so there is no
+// attr/group state to thread through here.
+func (h *recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h *recordingHandler) WithGroup(string) slog.Handler      { return h }
+
+// snapshot returns a copy of the log lines captured so far.
+func (h *recordingHandler) snapshot() []logLine {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.lines)
+}
+
+// findLine returns the single captured line at the given level with the given
+// message, failing if there is not exactly one.
+func findLine(t *testing.T, h *recordingHandler, level slog.Level, msg string) logLine {
+	t.Helper()
+	var matches []logLine
+	for _, l := range h.snapshot() {
+		if l.level == level && l.msg == msg {
+			matches = append(matches, l)
+		}
+	}
+	if len(matches) != 1 {
+		t.Fatalf("found %d records at %v with msg %q, want exactly 1", len(matches), level, msg)
+	}
+	return matches[0]
+}
+
+// countAtLevel returns how many captured lines are at exactly the given level.
+func countAtLevel(h *recordingHandler, level slog.Level) int {
+	n := 0
+	for _, l := range h.snapshot() {
+		if l.level == level {
+			n++
+		}
+	}
+	return n
+}
+
+// newCredClient starts a test server wired to handler and returns a Client whose
+// base URL embeds userinfo credentials, together with the recording handler
+// capturing its logs. Real requests therefore carry the credential (net/http
+// promotes URL userinfo to a Basic auth header) while the logs must not.
+func newCredClient(t *testing.T, handler http.Handler) (*Client, *recordingHandler) {
+	t.Helper()
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse srv.URL: %v", err)
+	}
+	h := &recordingHandler{}
+	c, err := NewClient("http://admin:secret@"+u.Host, WithAPIToken("test-token"), WithLogger(slog.New(h)))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	return c, h
+}
+
+// newCredClientClosedServer returns a credentialed, logging Client pointed at a
+// server that has already been closed, so the next request fails with a
+// transport error (connection refused).
+func newCredClientClosedServer(t *testing.T) (*Client, *recordingHandler) {
+	t.Helper()
+	srv := httptest.NewServer(http.NewServeMux())
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse srv.URL: %v", err)
+	}
+	srv.Close()
+	h := &recordingHandler{}
+	c, err := NewClient("http://admin:secret@"+u.Host, WithAPIToken("test-token"), WithLogger(slog.New(h)))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	return c, h
+}
+
+// newLoggedClient starts a test server wired to handler and returns a Client
+// with a recording logger and a plain (credential-free) base URL.
+func newLoggedClient(t *testing.T, handler http.Handler) (*Client, *recordingHandler) {
+	t.Helper()
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+	h := &recordingHandler{}
+	c, err := NewClient(srv.URL, WithAPIToken("test-token"), WithLogger(slog.New(h)))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	return c, h
 }
