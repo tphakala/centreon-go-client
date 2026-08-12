@@ -1,8 +1,12 @@
 package centreon
 
 import (
+	"context"
+	"encoding/base64"
 	"errors"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -214,5 +218,252 @@ func TestConcurrent401_LoginCalledOnce(t *testing.T) {
 
 	if n := loginCalls.Load(); n != 1 {
 		t.Errorf("login called %d times, want 1", n)
+	}
+}
+
+// #42: the request URL logged on the success (debug) path must have its
+// userinfo password redacted, while the real request still carries the
+// credential (net/http promotes URL userinfo to a Basic auth header).
+func TestSendRequest_DebugLogRedactsCredentials(t *testing.T) {
+	var gotAuth string
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /centreon/api/latest/hosts", func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+	c, h := newCredClient(t, mux)
+
+	var result map[string]string
+	if err := c.get(t.Context(), "/hosts", &result); err != nil {
+		t.Fatalf("get: %v", err)
+	}
+
+	wantAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:secret"))
+	if gotAuth != wantAuth {
+		t.Errorf("server Authorization = %q, want %q (credential must reach the wire)", gotAuth, wantAuth)
+	}
+
+	line := findLine(t, h, slog.LevelDebug, "request completed")
+	got, ok := line.attrs["url"]
+	if !ok {
+		t.Fatal("debug record missing url attr")
+	}
+	if strings.Contains(got, "secret") {
+		t.Errorf("logged url leaked password: %q", got)
+	}
+	if !strings.Contains(got, "admin:xxxxx@") {
+		t.Errorf("logged url = %q, want redacted admin:xxxxx@", got)
+	}
+}
+
+// #42: the URL logged on the API-error (>=400) path must be redacted too.
+func TestDo_APIErrorLogRedactsCredentials(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /centreon/api/latest/hosts", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"code": 1, "message": "boom"})
+	})
+	c, h := newCredClient(t, mux)
+
+	var result any
+	if err := c.get(t.Context(), "/hosts", &result); err == nil {
+		t.Fatal("expected API error")
+	}
+
+	line := findLine(t, h, slog.LevelError, "API error")
+	got := line.attrs["url"]
+	if strings.Contains(got, "secret") {
+		t.Errorf("API-error log leaked password: %q", got)
+	}
+	if !strings.Contains(got, "admin:xxxxx@") {
+		t.Errorf("logged url = %q, want redacted admin:xxxxx@", got)
+	}
+}
+
+// #42: the URL logged on the transport-error path must be redacted.
+func TestSendRequest_TransportErrorLogRedactsCredentials(t *testing.T) {
+	c, h := newCredClientClosedServer(t)
+
+	var result any
+	err := c.get(t.Context(), "/hosts", &result)
+	if err == nil {
+		t.Fatal("expected transport error")
+	}
+	// The returned error must not carry the clear password either. net/http masks
+	// it to admin:***@host via stripPassword; this pins that we do not regress it.
+	if strings.Contains(err.Error(), "secret") {
+		t.Errorf("returned transport error leaked password: %v", err)
+	}
+
+	line := findLine(t, h, slog.LevelError, "request failed")
+	got := line.attrs["url"]
+	if strings.Contains(got, "secret") {
+		t.Errorf("transport-error log leaked password in url attr: %q", got)
+	}
+	if !strings.Contains(got, "admin:xxxxx@") {
+		t.Errorf("logged url = %q, want redacted admin:xxxxx@", got)
+	}
+	if errAttr := line.attrs["error"]; strings.Contains(errAttr, "secret") {
+		t.Errorf("transport-error log leaked password in error attr: %q", errAttr)
+	}
+}
+
+// #42: a url.Parse failure must not echo the raw credential-bearing input. A NUL
+// byte is a control character that makes url.Parse fail; its *url.Error text
+// would otherwise include the full URL.
+func TestNewClient_ParseErrorDoesNotLeakCredentials(t *testing.T) {
+	_, err := NewClient("https://admin:secret@\x00host/centreon")
+	if err == nil {
+		t.Fatal("expected parse error")
+	}
+	if strings.Contains(err.Error(), "secret") {
+		t.Errorf("constructor error leaked password: %v", err)
+	}
+	// Redaction must preserve the *url.Error type so callers can still inspect it.
+	if _, ok := errors.AsType[*url.Error](err); !ok {
+		t.Errorf("expected *url.Error to be preserved in the chain, got %T", err)
+	}
+}
+
+// #42: a reqURL that fails to parse inside http.NewRequestWithContext yields a
+// *url.Error echoing the credentialed URL. That error is returned to the caller
+// (bypassing the loggers entirely), so it must be redacted too.
+func TestSendRequest_RequestBuildErrorDoesNotLeakCredentials(t *testing.T) {
+	c, _ := newCredClient(t, http.NewServeMux())
+
+	// A control character in the path makes the composed request URL invalid.
+	err := c.get(t.Context(), "/hosts/\x00bad", nil)
+	if err == nil {
+		t.Fatal("expected request-build error")
+	}
+	if strings.Contains(err.Error(), "secret") {
+		t.Errorf("returned error leaked password: %v", err)
+	}
+	if _, ok := errors.AsType[*url.Error](err); !ok {
+		t.Errorf("expected *url.Error to be preserved in the chain, got %T", err)
+	}
+}
+
+// #42: the "missing scheme or host" error must redact credentials for both the
+// opaque form (parses with an empty Host, so url.Redacted alone would leak) and
+// the scheme-relative form.
+func TestNewClient_MissingSchemeDoesNotLeakCredentials(t *testing.T) {
+	tests := []struct {
+		name       string
+		baseURL    string
+		wantSubstr string
+	}{
+		{"opaque", "admin:secret@host/centreon", "xxxxx@host"},
+		{"authority", "//admin:secret@host", "admin:xxxxx@host"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewClient(tt.baseURL)
+			if err == nil {
+				t.Fatalf("expected error for %q", tt.baseURL)
+			}
+			if strings.Contains(err.Error(), "secret") {
+				t.Errorf("constructor error leaked password: %v", err)
+			}
+			if !strings.Contains(err.Error(), "missing scheme or host") {
+				t.Errorf("error = %v, want to mention 'missing scheme or host'", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantSubstr) {
+				t.Errorf("error = %v, want to contain %q", err, tt.wantSubstr)
+			}
+		})
+	}
+}
+
+// #44: a request failing because the caller's context was cancelled must log at
+// Debug ("request cancelled"), never at Error.
+func TestSendRequest_ContextCanceledLogsDebug(t *testing.T) {
+	entered := make(chan struct{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /centreon/api/latest/hosts", func(_ http.ResponseWriter, r *http.Request) {
+		close(entered)
+		<-r.Context().Done() // block until the client cancels
+	})
+	c, h := newLoggedClient(t, mux)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	errCh := make(chan error, 1)
+	go func() {
+		var result any
+		errCh <- c.get(ctx, "/hosts", &result)
+	}()
+
+	<-entered
+	cancel()
+
+	err := <-errCh
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if n := countAtLevel(h, slog.LevelError); n != 0 {
+		t.Errorf("got %d Error records, want 0 (cancellation must not log at Error)", n)
+	}
+	findLine(t, h, slog.LevelDebug, "request cancelled")
+}
+
+// #44: a request timing out (DeadlineExceeded) is a real failure and must stay
+// at Error, not be demoted to Debug like a cancellation.
+func TestSendRequest_DeadlineExceededLogsError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /centreon/api/latest/hosts", func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done() // block until the deadline fires
+	})
+	c, h := newLoggedClient(t, mux)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+
+	var result any
+	err := c.get(ctx, "/hosts", &result)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
+	}
+	findLine(t, h, slog.LevelError, "request failed")
+	if n := countAtLevel(h, slog.LevelDebug); n != 0 {
+		t.Errorf("got %d Debug records, want 0 (a timeout is a real failure)", n)
+	}
+}
+
+// #42: redactURL is the security-critical helper. Pin its full accepted-input
+// domain directly, including inputs whose userinfo contains '/', '?', '#', or a
+// second '@', and scheme-relative / opaque forms that url.Parse does not expose
+// as userinfo. Every case must both match the exact expected output and never
+// contain the clear password.
+func TestRedactURL(t *testing.T) {
+	const secret = "secret"
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"plain credential url keeps username", "https://admin:secret@host/centreon/api", "https://admin:xxxxx@host/centreon/api"},
+		{"no credentials unchanged", "https://host:8443/centreon/api/latest/hosts", "https://host:8443/centreon/api/latest/hosts"},
+		{"scheme-relative parseable keeps username", "//admin:secret@host", "//admin:xxxxx@host"},
+		{"opaque masks whole userinfo", "admin:secret@host/centreon", "xxxxx@host/centreon"},
+		{"scheme-relative parse-fail", "//admin:secret@\x00host", "xxxxx@\x00host"},
+		{"full url parse-fail", "https://admin:secret@\x00host/centreon", "xxxxx@\x00host/centreon"},
+		{"slash in password", "http://admin:secret/x@host", "xxxxx@host"},
+		{"question mark in password", "http://admin:pw?secret@host", "xxxxx@host"},
+		{"second at in userinfo", "user:p@secret@host", "xxxxx@host"},
+		{"scheme marker after userinfo", "admin:secret@host/a://b", "xxxxx@host/a://b"},
+		{"scheme marker inside userinfo", "admin:secret://host@x", "xxxxx@x"},
+		{"host colon port not userinfo", "host:8080", "host:8080"},
+		{"at in path no creds", "///a@b", "xxxxx@b"},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := redactURL(tt.in)
+			if got != tt.want {
+				t.Errorf("redactURL(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+			if strings.Contains(got, secret) {
+				t.Errorf("redactURL(%q) leaked the password: %q", tt.in, got)
+			}
+		})
 	}
 }

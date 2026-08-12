@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -70,10 +71,13 @@ type Option func(*Client)
 func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, fmt.Errorf("centreon: invalid base URL: %w", err)
+		// url.Parse returns a *url.Error whose Error() echoes the raw URL,
+		// which may carry userinfo credentials (CWE-532). Redact the URL while
+		// keeping the *url.Error type so callers can still inspect it.
+		return nil, fmt.Errorf("centreon: invalid base URL: %w", redactURLError(err))
 	}
 	if u.Scheme == "" || u.Host == "" {
-		return nil, fmt.Errorf("centreon: invalid base URL %q: missing scheme or host", baseURL)
+		return nil, fmt.Errorf("centreon: invalid base URL %q: missing scheme or host", redactURL(baseURL))
 	}
 
 	c := &Client{
@@ -205,7 +209,9 @@ func (c *Client) sendRequest(ctx context.Context, method, reqURL string, body an
 
 	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("centreon: create request: %w", err)
+		// A malformed reqURL yields a *url.Error that echoes the URL, which
+		// carries the userinfo credential. Redact before returning (CWE-532).
+		return nil, fmt.Errorf("centreon: create request: %w", redactURLError(err))
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -225,7 +231,15 @@ func (c *Client) sendRequest(ctx context.Context, method, reqURL string, body an
 	resp, err := c.httpClient.Do(req)
 	duration := time.Since(start)
 	if err != nil {
-		c.logError(ctx, "request failed", method, reqURL, err, duration)
+		// A sibling request cancelled via a shared context (e.g. errgroup) is
+		// expected noise, not a failure, so log it at Debug. DeadlineExceeded
+		// and every other transport error stay at Error. The error is returned
+		// unchanged either way, so callers that care still see the cancellation.
+		if errors.Is(err, context.Canceled) {
+			c.logDebug(ctx, "request cancelled", method, reqURL, 0, duration)
+		} else {
+			c.logError(ctx, "request failed", method, reqURL, err, duration)
+		}
 		return nil, err
 	}
 	c.logDebug(ctx, "request completed", method, reqURL, resp.StatusCode, duration)
@@ -287,7 +301,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 		return apiErr
 	}
 
-	// 204 No Content — nothing to decode
+	// 204 No Content: nothing to decode
 	if resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
@@ -300,12 +314,57 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 	return nil
 }
 
-// Logging helpers — no-ops when logger is nil.
+// redactURL returns rawURL in a form safe for logs and error messages, with the
+// userinfo password masked. When the URL parses with a host the username is kept
+// (via url.URL.Redacted); for opaque or malformed input the whole userinfo, and
+// any scheme prefix, are masked. It is applied only at log/error-formatting time;
+// the stored baseURL and the URL sent on the wire are never modified, so real
+// requests still carry the credential.
+func redactURL(rawURL string) string {
+	if u, err := url.Parse(rawURL); err == nil && u.Host != "" {
+		return u.Redacted()
+	}
+	// Fall back for opaque or malformed input that url.Parse does not expose as
+	// userinfo (e.g. "admin:secret@host/path" parses with an empty Host, so
+	// (*url.URL).Redacted would return the secret verbatim).
+	return redactUserinfoString(rawURL)
+}
+
+// redactUserinfoString masks the userinfo of a string that url.Parse could not
+// expose as userinfo (opaque or malformed input). Everything up to the LAST '@'
+// is replaced with "xxxxx": the userinfo terminates at a '@' at or before the
+// last one, so no credential can survive whatever else the string contains. It
+// deliberately does not preserve a leading scheme, because a "://" inside the
+// userinfo cannot be told apart from a real scheme prefix; masking the scheme too
+// is safe in this error-message-only fallback. Input with no '@' is returned
+// unchanged.
+func redactUserinfoString(raw string) string {
+	at := strings.LastIndexByte(raw, '@')
+	if at < 0 {
+		return raw
+	}
+	return "xxxxx@" + raw[at+1:]
+}
+
+// redactURLError redacts userinfo credentials from a *url.Error's URL field,
+// which its Error() method echoes verbatim (CWE-532). It redacts in place and
+// returns the original error, preserving the errors.Is/As chain. Callers must
+// redact BEFORE wrapping with fmt.Errorf: a wrapper caches its message at
+// construction, so redacting a *url.Error already inside a wrapper would not
+// update the frozen message. An error with no *url.Error is unchanged.
+func redactURLError(err error) error {
+	if uerr, ok := errors.AsType[*url.Error](err); ok {
+		uerr.URL = redactURL(uerr.URL)
+	}
+	return err
+}
+
+// Logging helpers: no-ops when logger is nil.
 // Include tool name from context and request duration when available.
 
 func (c *Client) logDebug(ctx context.Context, msg, method, reqURL string, status int, duration time.Duration) {
 	if c.logger != nil {
-		attrs := []any{"method", method, "url", reqURL, "status", status, "duration", duration}
+		attrs := []any{"method", method, "url", redactURL(reqURL), "status", status, "duration", duration}
 		if tool := toolName(ctx); tool != "" {
 			attrs = append(attrs, "tool", tool)
 		}
@@ -325,7 +384,7 @@ func (c *Client) logInfo(ctx context.Context, msg string) {
 
 func (c *Client) logError(ctx context.Context, msg, method, reqURL string, err error, duration time.Duration) {
 	if c.logger != nil {
-		attrs := []any{"method", method, "url", reqURL, "error", err, "duration", duration}
+		attrs := []any{"method", method, "url", redactURL(reqURL), "error", err, "duration", duration}
 		if tool := toolName(ctx); tool != "" {
 			attrs = append(attrs, "tool", tool)
 		}
