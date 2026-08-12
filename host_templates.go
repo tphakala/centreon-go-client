@@ -16,7 +16,47 @@ type HostTemplate struct {
 	MaxCheckAttempts    *int   `json:"max_check_attempts"`
 	NormalCheckInterval *int   `json:"normal_check_interval"`
 	RetryCheckInterval  *int   `json:"retry_check_interval"`
-	IsLocked            bool   `json:"is_locked"`
+
+	CheckCommandArgs []string `json:"check_command_args,omitzero"`
+
+	SNMPVersion   string `json:"snmp_version,omitzero"`
+	SNMPCommunity string `json:"snmp_community,omitzero"`
+
+	TimezoneID *int `json:"timezone_id"`
+	SeverityID *int `json:"severity_id"`
+
+	ActiveCheckEnabled  int `json:"active_check_enabled"`
+	PassiveCheckEnabled int `json:"passive_check_enabled"`
+
+	NotificationEnabled       int  `json:"notification_enabled"`
+	NotificationOptions       *int `json:"notification_options"`
+	NotificationInterval      *int `json:"notification_interval"`
+	NotificationTimeperiodID  *int `json:"notification_timeperiod_id"`
+	AddInheritedContactGroup  bool `json:"add_inherited_contact_group"`
+	AddInheritedContact       bool `json:"add_inherited_contact"`
+	FirstNotificationDelay    *int `json:"first_notification_delay"`
+	RecoveryNotificationDelay *int `json:"recovery_notification_delay"`
+	AcknowledgementTimeout    *int `json:"acknowledgement_timeout"`
+
+	FreshnessChecked   int  `json:"freshness_checked"`
+	FreshnessThreshold *int `json:"freshness_threshold"`
+
+	FlapDetectionEnabled int  `json:"flap_detection_enabled"`
+	LowFlapThreshold     *int `json:"low_flap_threshold"`
+	HighFlapThreshold    *int `json:"high_flap_threshold"`
+
+	EventHandlerEnabled     int      `json:"event_handler_enabled"`
+	EventHandlerCommandID   *int     `json:"event_handler_command_id"`
+	EventHandlerCommandArgs []string `json:"event_handler_command_args,omitzero"`
+
+	NoteURL         string `json:"note_url,omitzero"`
+	Note            string `json:"note,omitzero"`
+	ActionURL       string `json:"action_url,omitzero"`
+	IconID          *int   `json:"icon_id"`
+	IconAlternative string `json:"icon_alternative,omitzero"`
+	Comment         string `json:"comment,omitzero"`
+
+	IsLocked bool `json:"is_locked"`
 }
 
 // CreateHostTemplateRequest is the request body for creating a host template.

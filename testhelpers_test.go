@@ -41,6 +41,56 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v) //nolint:errchkjson // test helper
 }
 
+// The want* helpers assert a single decoded field, keeping field-by-field
+// round-trip tests flat (one call per field) so a mistyped or mistagged struct
+// field still fails, without inflating each test's cognitive complexity.
+
+func wantInt(t *testing.T, name string, got, want int) {
+	t.Helper()
+	if got != want {
+		t.Errorf("%s = %d, want %d", name, got, want)
+	}
+}
+
+func wantStr(t *testing.T, name, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Errorf("%s = %q, want %q", name, got, want)
+	}
+}
+
+func wantBool(t *testing.T, name string, got, want bool) {
+	t.Helper()
+	if got != want {
+		t.Errorf("%s = %v, want %v", name, got, want)
+	}
+}
+
+func wantIntPtr(t *testing.T, name string, got *int, want int) {
+	t.Helper()
+	if got == nil {
+		t.Errorf("%s = nil, want %d", name, want)
+		return
+	}
+	if *got != want {
+		t.Errorf("%s = %d, want %d", name, *got, want)
+	}
+}
+
+func wantNilIntPtr(t *testing.T, name string, got *int) {
+	t.Helper()
+	if got != nil {
+		t.Errorf("%s = %v, want nil", name, got)
+	}
+}
+
+func wantStrSlice(t *testing.T, name string, got, want []string) {
+	t.Helper()
+	if !slices.Equal(got, want) {
+		t.Errorf("%s = %v, want %v", name, got, want)
+	}
+}
+
 // logLine is a captured log record reduced to the fields tests assert on, so
 // the heavy slog.Record is not copied around after capture.
 type logLine struct {

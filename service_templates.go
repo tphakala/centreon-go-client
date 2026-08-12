@@ -7,6 +7,11 @@ import (
 )
 
 // ServiceTemplate represents a Centreon service template configuration resource.
+//
+// The host_templates relationship returned by /configuration/services/templates
+// is not modeled yet: its wire shape is unconfirmed (array of IDs vs array of
+// {id, name} objects), and mistyping it would fail the whole List decode. See
+// issue #22.
 type ServiceTemplate struct {
 	ID                  int    `json:"id"`
 	Name                string `json:"name"`
@@ -16,7 +21,46 @@ type ServiceTemplate struct {
 	MaxCheckAttempts    *int   `json:"max_check_attempts"`
 	NormalCheckInterval *int   `json:"normal_check_interval"`
 	RetryCheckInterval  *int   `json:"retry_check_interval"`
-	IsLocked            bool   `json:"is_locked"`
+
+	CheckCommandArgs []string `json:"check_command_args,omitzero"`
+
+	ServiceTemplateID *int `json:"service_template_id"`
+	SeverityID        *int `json:"severity_id"`
+
+	ActiveCheckEnabled  int `json:"active_check_enabled"`
+	PassiveCheckEnabled int `json:"passive_check_enabled"`
+	VolatilityEnabled   int `json:"volatility_enabled"`
+
+	NotificationEnabled               int  `json:"notification_enabled"`
+	IsContactAdditiveInheritance      bool `json:"is_contact_additive_inheritance"`
+	IsContactGroupAdditiveInheritance bool `json:"is_contact_group_additive_inheritance"`
+	NotificationInterval              *int `json:"notification_interval"`
+	NotificationTimeperiodID          *int `json:"notification_timeperiod_id"`
+	NotificationType                  *int `json:"notification_type"`
+	FirstNotificationDelay            *int `json:"first_notification_delay"`
+	RecoveryNotificationDelay         *int `json:"recovery_notification_delay"`
+	AcknowledgementTimeout            *int `json:"acknowledgement_timeout"`
+
+	FreshnessChecked   int  `json:"freshness_checked"`
+	FreshnessThreshold *int `json:"freshness_threshold"`
+
+	FlapDetectionEnabled int  `json:"flap_detection_enabled"`
+	LowFlapThreshold     *int `json:"low_flap_threshold"`
+	HighFlapThreshold    *int `json:"high_flap_threshold"`
+
+	EventHandlerEnabled     int      `json:"event_handler_enabled"`
+	EventHandlerCommandID   *int     `json:"event_handler_command_id"`
+	EventHandlerCommandArgs []string `json:"event_handler_command_args,omitzero"`
+
+	GraphTemplateID *int   `json:"graph_template_id"`
+	NoteURL         string `json:"note_url,omitzero"`
+	Note            string `json:"note,omitzero"`
+	ActionURL       string `json:"action_url,omitzero"`
+	IconID          *int   `json:"icon_id"`
+	IconAlternative string `json:"icon_alternative,omitzero"`
+	Comment         string `json:"comment,omitzero"`
+
+	IsLocked bool `json:"is_locked"`
 }
 
 // CreateServiceTemplateRequest is the request body for creating a service template.

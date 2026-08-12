@@ -7,6 +7,113 @@ import (
 	"testing"
 )
 
+func TestServiceTemplateService_List_AllFields(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/templates", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{
+					"id": 1, "name": "tpl-full", "is_locked": false,
+					"check_command_args":                    []string{"-c", "check_http"},
+					"service_template_id":                   8,
+					"severity_id":                           7,
+					"active_check_enabled":                  2,
+					"passive_check_enabled":                 1,
+					"volatility_enabled":                    2,
+					"notification_enabled":                  2,
+					"is_contact_additive_inheritance":       true,
+					"is_contact_group_additive_inheritance": true,
+					"notification_interval":                 10,
+					"notification_timeperiod_id":            4,
+					"notification_type":                     3,
+					"first_notification_delay":              30,
+					"recovery_notification_delay":           15,
+					"acknowledgement_timeout":               60,
+					"freshness_checked":                     1,
+					"freshness_threshold":                   120,
+					"flap_detection_enabled":                2,
+					"low_flap_threshold":                    20,
+					"high_flap_threshold":                   80,
+					"event_handler_enabled":                 1,
+					"event_handler_command_id":              9,
+					"event_handler_command_args":            []string{"-w", "5"},
+					"graph_template_id":                     12,
+					"note_url":                              "http://note",
+					"note":                                  "a note",
+					"action_url":                            "http://action",
+					"icon_id":                               11,
+					"icon_alternative":                      "alt",
+					"comment":                               "a comment",
+				},
+				{
+					"id": 2, "name": "tpl-nulls", "is_locked": true,
+					"service_template_id": nil,
+					"severity_id":         nil,
+					"notification_type":   nil,
+					"graph_template_id":   nil,
+					"icon_id":             nil,
+					// A JSON null for a plain-int toggle decodes to 0 with no
+					// error (encoding/json treats null into a non-pointer as a
+					// no-op), so it does not break the List decode.
+					"active_check_enabled": nil,
+					"volatility_enabled":   nil,
+				},
+			},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
+		})
+	})
+
+	resp, err := c.ServiceTemplates.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(resp.Result) != 2 {
+		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
+	}
+
+	tpl := resp.Result[0]
+	wantStrSlice(t, "CheckCommandArgs", tpl.CheckCommandArgs, []string{"-c", "check_http"})
+	wantIntPtr(t, "ServiceTemplateID", tpl.ServiceTemplateID, 8)
+	wantIntPtr(t, "SeverityID", tpl.SeverityID, 7)
+	wantInt(t, "ActiveCheckEnabled", tpl.ActiveCheckEnabled, 2)
+	wantInt(t, "PassiveCheckEnabled", tpl.PassiveCheckEnabled, 1)
+	wantInt(t, "VolatilityEnabled", tpl.VolatilityEnabled, 2)
+	wantInt(t, "NotificationEnabled", tpl.NotificationEnabled, 2)
+	wantBool(t, "IsContactAdditiveInheritance", tpl.IsContactAdditiveInheritance, true)
+	wantBool(t, "IsContactGroupAdditiveInheritance", tpl.IsContactGroupAdditiveInheritance, true)
+	wantIntPtr(t, "NotificationInterval", tpl.NotificationInterval, 10)
+	wantIntPtr(t, "NotificationTimeperiodID", tpl.NotificationTimeperiodID, 4)
+	wantIntPtr(t, "NotificationType", tpl.NotificationType, 3)
+	wantIntPtr(t, "FirstNotificationDelay", tpl.FirstNotificationDelay, 30)
+	wantIntPtr(t, "RecoveryNotificationDelay", tpl.RecoveryNotificationDelay, 15)
+	wantIntPtr(t, "AcknowledgementTimeout", tpl.AcknowledgementTimeout, 60)
+	wantInt(t, "FreshnessChecked", tpl.FreshnessChecked, 1)
+	wantIntPtr(t, "FreshnessThreshold", tpl.FreshnessThreshold, 120)
+	wantInt(t, "FlapDetectionEnabled", tpl.FlapDetectionEnabled, 2)
+	wantIntPtr(t, "LowFlapThreshold", tpl.LowFlapThreshold, 20)
+	wantIntPtr(t, "HighFlapThreshold", tpl.HighFlapThreshold, 80)
+	wantInt(t, "EventHandlerEnabled", tpl.EventHandlerEnabled, 1)
+	wantIntPtr(t, "EventHandlerCommandID", tpl.EventHandlerCommandID, 9)
+	wantStrSlice(t, "EventHandlerCommandArgs", tpl.EventHandlerCommandArgs, []string{"-w", "5"})
+	wantIntPtr(t, "GraphTemplateID", tpl.GraphTemplateID, 12)
+	wantStr(t, "NoteURL", tpl.NoteURL, "http://note")
+	wantStr(t, "Note", tpl.Note, "a note")
+	wantStr(t, "ActionURL", tpl.ActionURL, "http://action")
+	wantIntPtr(t, "IconID", tpl.IconID, 11)
+	wantStr(t, "IconAlternative", tpl.IconAlternative, "alt")
+	wantStr(t, "Comment", tpl.Comment, "a comment")
+
+	nulls := resp.Result[1]
+	wantNilIntPtr(t, "Result[1].ServiceTemplateID", nulls.ServiceTemplateID)
+	wantNilIntPtr(t, "Result[1].SeverityID", nulls.SeverityID)
+	wantNilIntPtr(t, "Result[1].NotificationType", nulls.NotificationType)
+	wantNilIntPtr(t, "Result[1].GraphTemplateID", nulls.GraphTemplateID)
+	wantNilIntPtr(t, "Result[1].IconID", nulls.IconID)
+	wantInt(t, "Result[1].ActiveCheckEnabled", nulls.ActiveCheckEnabled, 0)
+	wantInt(t, "Result[1].VolatilityEnabled", nulls.VolatilityEnabled, 0)
+}
+
 func TestServiceTemplateService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
