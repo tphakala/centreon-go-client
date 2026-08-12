@@ -221,6 +221,83 @@ func TestConcurrent401_LoginCalledOnce(t *testing.T) {
 	}
 }
 
+// TestReauthCancelled_HonorsContext verifies that a goroutine waiting on the
+// re-auth semaphore returns its context's error promptly instead of blocking
+// until login() finishes. The semaphore is occupied by the test, so acquireLogin
+// can only proceed via the ctx.Done() arm.
+func TestReauthCancelled_HonorsContext(t *testing.T) {
+	mux, c := newTestMux(t)
+	c.username = "admin"
+	c.password = "secret"
+	c.token = "expired-token"
+
+	// Occupy the re-auth semaphore and never release it: reauthenticate must fall
+	// back to the context, not block forever.
+	c.loginSem <- struct{}{}
+
+	var hostHits atomic.Int32
+	mux.HandleFunc("GET /centreon/api/latest/hosts", func(w http.ResponseWriter, _ *http.Request) {
+		hostHits.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+
+	// A short deadline, not a pre-cancelled context: the first request must
+	// succeed (return 401) so execution reaches the semaphore-guarded re-auth
+	// path. A pre-cancelled context would instead short-circuit the very first
+	// sendRequest in do() and never exercise acquireLogin's ctx.Done() arm. The
+	// deadline is generous relative to a local httptest round trip, so the block
+	// happens in acquireLogin; the 2s bound below fails fast if that arm is gone.
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		var result map[string]string
+		done <- c.get(ctx, "/hosts", &result)
+	}()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+			t.Errorf("err = %v, want context.DeadlineExceeded or context.Canceled", err)
+		}
+		// Positive control: the /hosts request must have been served (401) so
+		// execution reached the semaphore-guarded re-auth path and blocked in
+		// acquireLogin, rather than the first sendRequest timing out earlier and
+		// verifying nothing. The retry never fires (reauthenticate returns the
+		// ctx error), so the handler is hit exactly once.
+		if got := hostHits.Load(); got != 1 {
+			t.Errorf("hosts handler hit %d times, want 1 (request must reach acquireLogin)", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("do() did not return after the context deadline; acquireLogin ignored ctx")
+	}
+}
+
+// TestReauthLoginFailure_Logged verifies that a failed re-authentication (login
+// rejected with a 4xx) emits a distinct error line so the operator can see the
+// failure originated in the re-auth path.
+func TestReauthLoginFailure_Logged(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /centreon/api/latest/hosts", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	mux.HandleFunc("POST /centreon/api/latest/login", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusForbidden, map[string]any{"code": 1, "message": "login rejected"})
+	})
+	c, h := newLoggedClient(t, mux)
+	c.username = "admin"
+	c.password = "secret"
+	c.token = "expired-token"
+
+	var result map[string]string
+	err := c.get(t.Context(), "/hosts", &result)
+	if err == nil {
+		t.Fatal("expected error from failed re-authentication")
+	}
+	findLine(t, h, slog.LevelError, "re-authentication failed")
+}
+
 // #42: the request URL logged on the success (debug) path must have its
 // userinfo password redacted, while the real request still carries the
 // credential (net/http promotes URL userinfo to a Basic auth header).
