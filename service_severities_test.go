@@ -39,6 +39,22 @@ func TestServiceSeverityService_Get(t *testing.T) {
 	}
 }
 
+func TestServiceSeverityService_Get_Error(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/severities/4", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"code": 500, "message": "boom"})
+	})
+
+	sev, err := c.ServiceSeverities.Get(t.Context(), 4)
+	if err == nil {
+		t.Fatal("Get: want error on HTTP 500, got nil")
+	}
+	if sev != nil {
+		t.Errorf("Get result = %v, want nil on error", sev)
+	}
+}
+
 func TestServiceSeverityService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
