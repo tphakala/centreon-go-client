@@ -6,6 +6,39 @@ import (
 	"testing"
 )
 
+func TestServiceSeverityService_Get(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/severities/4", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, ServiceSeverity{
+			ID: 4, Name: "info", Alias: "Informational", Level: 4, IconID: 14, IsActivated: true,
+		})
+	})
+
+	sev, err := c.ServiceSeverities.Get(t.Context(), 4)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if sev.ID != 4 {
+		t.Errorf("ID = %d, want 4", sev.ID)
+	}
+	if sev.Level != 4 {
+		t.Errorf("Level = %d, want 4", sev.Level)
+	}
+	if sev.Name != "info" {
+		t.Errorf("Name = %q, want %q", sev.Name, "info")
+	}
+	if sev.Alias != "Informational" {
+		t.Errorf("Alias = %q, want %q", sev.Alias, "Informational")
+	}
+	if sev.IconID != 14 {
+		t.Errorf("IconID = %d, want 14", sev.IconID)
+	}
+	if !sev.IsActivated {
+		t.Error("IsActivated = false, want true")
+	}
+}
+
 func TestServiceSeverityService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 

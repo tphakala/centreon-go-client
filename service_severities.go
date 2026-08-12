@@ -49,6 +49,15 @@ func (s *ServiceSeverityService) All(ctx context.Context, opts ...ListOption) it
 	return all(ctx, s.List, opts)
 }
 
+// Get returns the service severity with the given ID using a direct GET request.
+func (s *ServiceSeverityService) Get(ctx context.Context, id int) (*ServiceSeverity, error) {
+	var sev ServiceSeverity
+	if err := s.client.get(ctx, fmt.Sprintf("/configuration/services/severities/%d", id), &sev); err != nil {
+		return nil, err
+	}
+	return &sev, nil
+}
+
 // Create creates a new service severity and returns its ID.
 func (s *ServiceSeverityService) Create(ctx context.Context, req CreateServiceSeverityRequest) (int, error) {
 	var result struct {
