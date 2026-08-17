@@ -20,6 +20,12 @@ type CreateServiceCategoryRequest struct {
 	Alias string `json:"alias,omitzero"`
 }
 
+// UpdateServiceCategoryRequest is the request body for updating a service category (PUT).
+type UpdateServiceCategoryRequest struct {
+	Name  string `json:"name"`
+	Alias string `json:"alias,omitzero"`
+}
+
 // ServiceCategoryService provides service category configuration operations.
 type ServiceCategoryService struct {
 	client *Client
@@ -37,6 +43,15 @@ func (s *ServiceCategoryService) All(ctx context.Context, opts ...ListOption) it
 	return all(ctx, s.List, opts)
 }
 
+// Get returns the service category with the given ID using a direct GET request.
+func (s *ServiceCategoryService) Get(ctx context.Context, id int) (*ServiceCategory, error) {
+	var cat ServiceCategory
+	if err := s.client.get(ctx, fmt.Sprintf("/configuration/services/categories/%d", id), &cat); err != nil {
+		return nil, err
+	}
+	return &cat, nil
+}
+
 // Create creates a new service category and returns its ID.
 func (s *ServiceCategoryService) Create(ctx context.Context, req CreateServiceCategoryRequest) (int, error) {
 	var result struct {
@@ -46,6 +61,11 @@ func (s *ServiceCategoryService) Create(ctx context.Context, req CreateServiceCa
 		return 0, err
 	}
 	return result.ID, nil
+}
+
+// Update replaces an existing service category using PUT.
+func (s *ServiceCategoryService) Update(ctx context.Context, id int, req UpdateServiceCategoryRequest) error {
+	return s.client.put(ctx, fmt.Sprintf("/configuration/services/categories/%d", id), req)
 }
 
 // Delete deletes a service category by ID.

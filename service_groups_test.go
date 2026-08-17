@@ -31,6 +31,51 @@ func TestServiceGroupService_List(t *testing.T) {
 	}
 }
 
+func TestServiceGroupService_Get(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/groups/5", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, ServiceGroup{ID: 5, Name: "web-services", Alias: "Web Services", IsActivated: true})
+	})
+
+	sg, err := c.ServiceGroups.Get(t.Context(), 5)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	wantInt(t, "ID", sg.ID, 5)
+	wantStr(t, "Name", sg.Name, "web-services")
+	wantStr(t, "Alias", sg.Alias, "Web Services")
+	wantBool(t, "IsActivated", sg.IsActivated, true)
+}
+
+func TestServiceGroupService_Update(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	var called bool
+	mux.HandleFunc("PUT /centreon/api/latest/configuration/services/groups/5", func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		var req UpdateServiceGroupRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		if req.Name != "updated-group" {
+			t.Errorf("Name = %q, want %q", req.Name, "updated-group")
+		}
+		if req.Alias != "Updated Group" {
+			t.Errorf("Alias = %q, want %q", req.Alias, "Updated Group")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := c.ServiceGroups.Update(t.Context(), 5, UpdateServiceGroupRequest{Name: "updated-group", Alias: "Updated Group"})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if !called {
+		t.Error("handler was not called")
+	}
+}
+
 func TestServiceGroupService_Create(t *testing.T) {
 	mux, c := newTestMux(t)
 

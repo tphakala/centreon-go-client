@@ -20,6 +20,12 @@ type CreateServiceGroupRequest struct {
 	Alias string `json:"alias,omitzero"`
 }
 
+// UpdateServiceGroupRequest is the request body for updating a service group (PUT).
+type UpdateServiceGroupRequest struct {
+	Name  string `json:"name"`
+	Alias string `json:"alias,omitzero"`
+}
+
 // ServiceGroupService provides service group configuration operations.
 type ServiceGroupService struct {
 	client *Client
@@ -37,6 +43,15 @@ func (s *ServiceGroupService) All(ctx context.Context, opts ...ListOption) iter.
 	return all(ctx, s.List, opts)
 }
 
+// Get returns the service group with the given ID using a direct GET request.
+func (s *ServiceGroupService) Get(ctx context.Context, id int) (*ServiceGroup, error) {
+	var sg ServiceGroup
+	if err := s.client.get(ctx, fmt.Sprintf("/configuration/services/groups/%d", id), &sg); err != nil {
+		return nil, err
+	}
+	return &sg, nil
+}
+
 // Create creates a new service group and returns its ID.
 func (s *ServiceGroupService) Create(ctx context.Context, req CreateServiceGroupRequest) (int, error) {
 	var result struct {
@@ -46,6 +61,11 @@ func (s *ServiceGroupService) Create(ctx context.Context, req CreateServiceGroup
 		return 0, err
 	}
 	return result.ID, nil
+}
+
+// Update replaces an existing service group using PUT.
+func (s *ServiceGroupService) Update(ctx context.Context, id int, req UpdateServiceGroupRequest) error {
+	return s.client.put(ctx, fmt.Sprintf("/configuration/services/groups/%d", id), req)
 }
 
 // Delete deletes a service group by ID.

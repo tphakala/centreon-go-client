@@ -31,6 +31,51 @@ func TestServiceCategoryService_List(t *testing.T) {
 	}
 }
 
+func TestServiceCategoryService_Get(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/categories/3", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, ServiceCategory{ID: 3, Name: "storage", Alias: "Storage", IsActivated: true})
+	})
+
+	cat, err := c.ServiceCategories.Get(t.Context(), 3)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	wantInt(t, "ID", cat.ID, 3)
+	wantStr(t, "Name", cat.Name, "storage")
+	wantStr(t, "Alias", cat.Alias, "Storage")
+	wantBool(t, "IsActivated", cat.IsActivated, true)
+}
+
+func TestServiceCategoryService_Update(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	var called bool
+	mux.HandleFunc("PUT /centreon/api/latest/configuration/services/categories/3", func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		var req UpdateServiceCategoryRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		if req.Name != "updated" {
+			t.Errorf("Name = %q, want %q", req.Name, "updated")
+		}
+		if req.Alias != "Updated Alias" {
+			t.Errorf("Alias = %q, want %q", req.Alias, "Updated Alias")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := c.ServiceCategories.Update(t.Context(), 3, UpdateServiceCategoryRequest{Name: "updated", Alias: "Updated Alias"})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if !called {
+		t.Error("handler was not called")
+	}
+}
+
 func TestServiceCategoryService_Create(t *testing.T) {
 	mux, c := newTestMux(t)
 
