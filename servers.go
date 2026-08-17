@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"time"
 )
 
 // MonitoringServer represents a Centreon monitoring server (poller).
@@ -14,17 +15,19 @@ import (
 // booleans follow the proven is_activate/is_default typing already used on this
 // same endpoint, and every field is exercised by a round-trip decode test.
 //
-// The last_restart field returned by /configuration/monitoring-servers is not
-// modeled yet: its wire type is unconfirmed (RFC3339 string vs unix integer),
-// and mistyping it would fail the whole List decode. See issue #23.
+// LastRestart is a pointer because the poller reports null until its engine is
+// first (re)started; the wire value is otherwise an RFC3339 string, confirmed
+// live against Centreon Web 25.10.16 (e.g. "2026-08-17T09:47:37+00:00"), which
+// time.Time decodes natively.
 type MonitoringServer struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Address     string `json:"address,omitzero"`
-	IsActivated bool   `json:"is_activate"`
-	IsDefault   bool   `json:"is_default"`
-	IsLocalhost bool   `json:"is_localhost"`
-	IsUpdated   bool   `json:"is_updated"`
+	ID          int        `json:"id"`
+	Name        string     `json:"name"`
+	Address     string     `json:"address,omitzero"`
+	IsActivated bool       `json:"is_activate"`
+	IsDefault   bool       `json:"is_default"`
+	IsLocalhost bool       `json:"is_localhost"`
+	IsUpdated   bool       `json:"is_updated"`
+	LastRestart *time.Time `json:"last_restart"`
 
 	EngineStartCommand   string `json:"engine_start_command,omitzero"`
 	EngineStopCommand    string `json:"engine_stop_command,omitzero"`

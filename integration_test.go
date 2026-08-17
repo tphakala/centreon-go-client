@@ -180,6 +180,40 @@ func TestIntegration_ListMonitoringServers(t *testing.T) {
 	}
 }
 
+// TestIntegration_MonitoringServerLastRestart verifies the last_restart field
+// added for issue #48 against a live instance. The decode is pinned offline by
+// TestMonitoringServer_LastRestartShapes; this test confirms the live RFC3339
+// wire value parses into a real timestamp on a restarted poller. last_restart
+// is null on a never-restarted poller, so the test skips if no poller reports a
+// non-null value.
+func TestIntegration_MonitoringServerLastRestart(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	resp, err := client.MonitoringServers.List(t.Context())
+	if err != nil {
+		t.Skipf("MonitoringServers.List: %v (may require admin permissions)", err)
+	}
+	if len(resp.Result) == 0 {
+		t.Skip("no monitoring servers returned")
+	}
+
+	var found bool
+	for _, s := range resp.Result {
+		if s.LastRestart == nil {
+			t.Logf("poller %d (%s): last_restart null (engine not yet restarted)", s.ID, s.Name)
+			continue
+		}
+		found = true
+		if s.LastRestart.IsZero() {
+			t.Errorf("poller %d (%s): last_restart present but parsed to the zero time", s.ID, s.Name)
+		}
+		t.Logf("poller %d (%s): last_restart = %s", s.ID, s.Name, s.LastRestart.Format(time.RFC3339))
+	}
+	if !found {
+		t.Skip("no poller reported a non-null last_restart (no engine restarted); wire value unverified live this run")
+	}
+}
+
 // --- User/contact endpoints (fixed in #28) ---
 
 func TestIntegration_ListUsers(t *testing.T) {

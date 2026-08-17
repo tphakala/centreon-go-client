@@ -3,6 +3,7 @@ package centreon
 import (
 	"net/http"
 	"testing"
+	"time"
 )
 
 func TestMonitoringServerService_List_AllFields(t *testing.T) {
@@ -31,6 +32,7 @@ func TestMonitoringServerService_List_AllFields(t *testing.T) {
 					"snmp_trapd_path_conf":       "/etc/snmp/centreon_traps",
 					"remote_id":                  nil,
 					"remote_server_use_as_proxy": true,
+					"last_restart":               "2026-08-17T09:47:37+00:00",
 				},
 				{
 					"id": 2, "name": "Remote", "address": "10.0.0.9",
@@ -72,12 +74,18 @@ func TestMonitoringServerService_List_AllFields(t *testing.T) {
 	wantStr(t, "SNMPTrapdPathConf", s.SNMPTrapdPathConf, "/etc/snmp/centreon_traps")
 	wantNilIntPtr(t, "RemoteID", s.RemoteID)
 	wantBool(t, "RemoteServerUseAsProxy", s.RemoteServerUseAsProxy, true)
+	if s.LastRestart == nil {
+		t.Error("LastRestart = nil, want the decoded timestamp")
+	}
 
 	s1 := resp.Result[1]
 	wantIntPtr(t, "Result[1].RemoteID", s1.RemoteID, 5)
 	wantInt(t, "Result[1].SSHPort", s1.SSHPort, 2222)
 	wantBool(t, "Result[1].IsLocalhost", s1.IsLocalhost, false)
 	wantBool(t, "Result[1].IsUpdated", s1.IsUpdated, true)
+	if s1.LastRestart != nil {
+		t.Errorf("Result[1].LastRestart = %v, want nil (field absent)", s1.LastRestart)
+	}
 }
 
 func TestMonitoringServerService_List(t *testing.T) {
@@ -109,6 +117,47 @@ func TestMonitoringServerService_List(t *testing.T) {
 	}
 	if resp.Result[1].Name != "Poller" {
 		t.Errorf("Result[1].Name = %q, want %q", resp.Result[1].Name, "Poller")
+	}
+}
+
+// TestMonitoringServer_LastRestartShapes pins the three wire shapes the poller
+// reports for last_restart: an RFC3339 string (a restarted engine), JSON null
+// (never restarted), and an absent key. All three must decode without error;
+// only the string yields a non-nil *time.Time.
+func TestMonitoringServer_LastRestartShapes(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/monitoring-servers", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "name": "Restarted", "last_restart": "2026-08-17T09:47:37+00:00"},
+				{"id": 2, "name": "NeverRestarted", "last_restart": nil},
+				{"id": 3, "name": "Absent"},
+			},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 3},
+		})
+	})
+
+	resp, err := c.MonitoringServers.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(resp.Result) != 3 {
+		t.Fatalf("len(Result) = %d, want 3", len(resp.Result))
+	}
+
+	want, err := time.Parse(time.RFC3339, "2026-08-17T09:47:37+00:00")
+	if err != nil {
+		t.Fatalf("parse want: %v", err)
+	}
+	if got := resp.Result[0].LastRestart; got == nil || !got.Equal(want) {
+		t.Errorf("populated LastRestart = %v, want %v", got, want)
+	}
+	if got := resp.Result[1].LastRestart; got != nil {
+		t.Errorf("null LastRestart = %v, want nil", got)
+	}
+	if got := resp.Result[2].LastRestart; got != nil {
+		t.Errorf("absent LastRestart = %v, want nil", got)
 	}
 }
 
