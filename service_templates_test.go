@@ -118,8 +118,41 @@ func TestServiceTemplateService_List_AllFields(t *testing.T) {
 	wantNilIntPtr(t, "Result[1].IconID", nulls.IconID)
 	wantInt(t, "Result[1].ActiveCheckEnabled", nulls.ActiveCheckEnabled, 0)
 	wantInt(t, "Result[1].VolatilityEnabled", nulls.VolatilityEnabled, 0)
-	if len(nulls.HostTemplates) != 0 {
-		t.Errorf("Result[1].HostTemplates = %v, want empty", nulls.HostTemplates)
+	if nulls.HostTemplates == nil || len(nulls.HostTemplates) != 0 {
+		t.Errorf("Result[1].HostTemplates = %v, want non-nil empty slice", nulls.HostTemplates)
+	}
+}
+
+// TestServiceTemplateService_List_HostTemplatesNullAndAbsent pins the two wire
+// shapes the populated/empty fixtures do not cover: a JSON null value and an
+// absent host_templates key must both decode to a nil slice without breaking
+// the List decode. The bare integer-array shape is verified live against
+// Centreon Web 24.10.29; these two cases are defensive.
+func TestServiceTemplateService_List_HostTemplatesNullAndAbsent(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/templates", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "name": "null-value", "host_templates": nil},
+				{"id": 2, "name": "absent-key"},
+			},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
+		})
+	})
+
+	resp, err := c.ServiceTemplates.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(resp.Result) != 2 {
+		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
+	}
+	if got := resp.Result[0].HostTemplates; got != nil {
+		t.Errorf("null-value HostTemplates = %v, want nil", got)
+	}
+	if got := resp.Result[1].HostTemplates; got != nil {
+		t.Errorf("absent-key HostTemplates = %v, want nil", got)
 	}
 }
 
