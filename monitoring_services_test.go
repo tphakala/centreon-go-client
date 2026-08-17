@@ -2,6 +2,7 @@ package centreon
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"reflect"
 	"testing"
@@ -373,6 +374,69 @@ func TestMonitoringServiceService_Metrics_Error(t *testing.T) {
 	metrics, err := c.MonitoringServices.Metrics(t.Context(), 10, 20)
 	if err == nil {
 		t.Fatal("Metrics: want error on HTTP 500, got nil")
+	}
+	if metrics != nil {
+		t.Errorf("Metrics result = %v, want nil on error", metrics)
+	}
+}
+
+func TestMonitoringServiceService_Metrics_NoMetrics(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	// On 25.10.x a service with no perfdata returns 404 "metrics not found".
+	// Metrics maps that specific response to an empty result, not an error.
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/services/20/metrics", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"code": 404, "message": "metrics not found"})
+	})
+
+	metrics, err := c.MonitoringServices.Metrics(t.Context(), 10, 20)
+	if err != nil {
+		t.Fatalf("Metrics: want nil error for a no-perfdata 404, got %v", err)
+	}
+	if len(metrics) != 0 {
+		t.Errorf("Metrics = %v, want empty", metrics)
+	}
+}
+
+func TestMonitoringServiceService_Metrics_NotFoundError(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	// A 404 that is not the "metrics not found" no-perfdata signal (for example a
+	// nonexistent host or service) must surface as an *APIError, not be masked.
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/services/20/metrics", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"code": 404, "message": "Resource not found"})
+	})
+
+	metrics, err := c.MonitoringServices.Metrics(t.Context(), 10, 20)
+	if err == nil {
+		t.Fatal("Metrics: want error on a non-perfdata 404, got nil")
+	}
+	if metrics != nil {
+		t.Errorf("Metrics result = %v, want nil on error", metrics)
+	}
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok {
+		t.Fatalf("error is %T, want *APIError", err)
+	}
+	if apiErr.HTTPStatus != http.StatusNotFound {
+		t.Errorf("HTTPStatus = %d, want 404", apiErr.HTTPStatus)
+	}
+}
+
+func TestMonitoringServiceService_Metrics_NotFoundMessageOn500(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	// The no-metrics mapping is gated on HTTP 404 specifically. A non-404 status
+	// carrying the same "metrics not found" message (here a 500) must still
+	// surface as an error, not be mapped to an empty result. This pins the
+	// HTTPStatus == 404 condition of the guard.
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/services/20/metrics", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"code": 500, "message": "metrics not found"})
+	})
+
+	metrics, err := c.MonitoringServices.Metrics(t.Context(), 10, 20)
+	if err == nil {
+		t.Fatal("Metrics: want error for a 500 even with a 'metrics not found' message, got nil")
 	}
 	if metrics != nil {
 		t.Errorf("Metrics result = %v, want nil on error", metrics)

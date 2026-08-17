@@ -41,6 +41,13 @@ func (s *UserService) All(ctx context.Context, opts ...ListOption) iter.Seq2[*Us
 }
 
 // Update updates an existing user using PATCH.
+//
+// On Centreon Web 25.10.x this returns an *APIError with HTTP 404
+// ("No route found"): the PATCH /configuration/users/{id} route is not
+// registered, and PUT, POST, and DELETE for users and contacts are likewise
+// unregistered, so user and contact configuration is effectively read-only
+// through the v2 REST API on that version. The method is retained for older
+// and future versions that register the route.
 func (s *UserService) Update(ctx context.Context, id int, req UpdateUserRequest) error {
 	return s.client.patch(ctx, fmt.Sprintf("/configuration/users/%d", id), req)
 }

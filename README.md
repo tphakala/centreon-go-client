@@ -89,23 +89,31 @@ func main() {
 
 | Resource | List | Update | Notes |
 |----------|------|--------|-------|
-| Users | yes | PATCH | No create/delete via API |
+| Users | yes | PATCH* | No create/delete via API |
 | Contact Groups | yes | - | Read-only |
 | Contact Templates | yes | - | Read-only |
-| User Filters | yes | PUT + PATCH | Full CRUD |
+| User Filters | yes | PUT + PATCH** | PUT replaces; PATCH reorders |
+
+*\* On Centreon Web 25.10.x, `UserService.Update` (`PATCH /configuration/users/{id}`) returns an `*APIError` with HTTP 404 (`No route found`): the route is unregistered, and PUT, POST, and DELETE for users and contacts are likewise absent, so users and contacts are effectively read-only through the v2 REST API on that version. The method is retained for other Centreon versions that register the route.*
+
+*\*\* User filters send the plural `criterias` array on Create and Update (Centreon 25.10.x rejects the singular `criteria`), and `UserFilter` now also decodes the `order` field. `Update` (PUT) replaces a filter, including its name; `Patch` (PATCH) is a reorder-only route that sends `order` and cannot rename. The element shape of `FilterCriteria` is not yet verified against a populated filter.*
 
 ### Monitoring (real-time)
 
 | Resource | Methods |
 |----------|---------|
-| Unified Resources | List, GetHost, GetService |
+| Unified Resources | List, GetHost, GetService† |
 | Monitoring Hosts | List, Get, StatusCounts, Services, Timeline |
-| Monitoring Services | List, StatusCounts, Timeline, Metrics |
+| Monitoring Services | List, StatusCounts, Timeline, Metrics‡ |
 | Downtimes | List, Get, Cancel, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
 | Acknowledgements | List, Get, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
 | Notification Policies | GetForHost, GetForService |
 
 *Notification policy reads may return an `*APIError` with HTTP 500 or 404 on some hosts on Centreon 25.10.x; this is a server-side defect on that version, not a client error.*
+
+*† `GetHost` populates `HostID`, and `GetService` populates `HostID` and `ServiceID`, from the call arguments, because the Centreon 25.10.x per-id detail endpoint omits them at the top level; that endpoint also does not report `is_notification_enabled`, so `NotificationEnabled` is populated only by `List` (and `All`).*
+
+*‡ `Metrics` returns an empty result rather than an error when a service has no performance data: Centreon 25.10.x answers that case with HTTP 404 `metrics not found`, which the client maps to an empty slice. Any other 404 (for example a nonexistent host or service) is surfaced as an `*APIError`.*
 
 ### Downtime Management
 

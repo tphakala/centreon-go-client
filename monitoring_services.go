@@ -2,8 +2,11 @@ package centreon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
+	"net/http"
+	"strings"
 )
 
 // MonitoringServiceHost is the nested host reference in a monitoring service response.
@@ -92,9 +95,20 @@ func (s *MonitoringServiceService) Timeline(ctx context.Context, hostID, service
 // Metrics returns the performance metrics for a given service on a host.
 // The endpoint returns a plain JSON array, so there is no pagination and
 // no ListOption support.
+//
+// On Centreon 25.10.x a service with no perfdata returns HTTP 404
+// {"code":404,"message":"metrics not found"} instead of an empty array. That
+// specific response is treated as an empty metric set (nil, nil). Any other 404
+// (for example a nonexistent host or service) is surfaced as an *APIError so a
+// genuine wrong-id lookup is not masked.
 func (s *MonitoringServiceService) Metrics(ctx context.Context, hostID, serviceID int) ([]Metric, error) {
 	var result []Metric
 	if err := s.client.get(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/metrics", hostID, serviceID), &result); err != nil {
+		if apiErr, ok := errors.AsType[*APIError](err); ok &&
+			apiErr.HTTPStatus == http.StatusNotFound &&
+			strings.Contains(strings.ToLower(apiErr.Message), "metrics not found") {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return result, nil

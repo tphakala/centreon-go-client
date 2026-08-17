@@ -34,11 +34,16 @@ type CreateTimePeriodRequest struct {
 }
 
 // UpdateTimePeriodRequest is the request body for replacing a time period (PUT).
+//
+// On Centreon 25.10.x, PUT /configuration/timeperiods/{id} requires the
+// exceptions field, so Update always sends it (normalizing a nil slice to an
+// empty array); Create does not require it. See TimePeriodService.Update.
 type UpdateTimePeriodRequest struct {
-	Name      string          `json:"name"`
-	Alias     string          `json:"alias"`
-	Days      []TimePeriodDay `json:"days"`
-	Templates []int           `json:"templates"`
+	Name       string          `json:"name"`
+	Alias      string          `json:"alias"`
+	Days       []TimePeriodDay `json:"days"`
+	Templates  []int           `json:"templates"`
+	Exceptions []any           `json:"exceptions"`
 }
 
 // TimePeriodService provides time period configuration operations.
@@ -69,30 +74,42 @@ func (s *TimePeriodService) Get(ctx context.Context, id int) (*TimePeriod, error
 
 // Create creates a new time period and returns its ID.
 func (s *TimePeriodService) Create(ctx context.Context, req *CreateTimePeriodRequest) (int, error) {
-	if req.Days == nil {
-		req.Days = []TimePeriodDay{}
+	// Normalize nil slices to empty arrays on a copy so the caller's request
+	// struct is left unmodified (the API rejects null for these fields).
+	body := *req
+	if body.Days == nil {
+		body.Days = []TimePeriodDay{}
 	}
-	if req.Templates == nil {
-		req.Templates = []int{}
+	if body.Templates == nil {
+		body.Templates = []int{}
 	}
 	var result struct {
 		ID int `json:"id"`
 	}
-	if err := s.client.post(ctx, "/configuration/timeperiods", req, &result); err != nil {
+	if err := s.client.post(ctx, "/configuration/timeperiods", &body, &result); err != nil {
 		return 0, err
 	}
 	return result.ID, nil
 }
 
 // Update replaces an existing time period using PUT.
+//
+// On Centreon 25.10.x the exceptions field is required on update (unlike
+// create), so a nil Exceptions slice is normalized to an empty array to avoid
+// an HTTP 400 "[exceptions] required" response. Normalization is applied to a
+// copy so the caller's request struct is left unmodified.
 func (s *TimePeriodService) Update(ctx context.Context, id int, req *UpdateTimePeriodRequest) error {
-	if req.Days == nil {
-		req.Days = []TimePeriodDay{}
+	body := *req
+	if body.Days == nil {
+		body.Days = []TimePeriodDay{}
 	}
-	if req.Templates == nil {
-		req.Templates = []int{}
+	if body.Templates == nil {
+		body.Templates = []int{}
 	}
-	return s.client.put(ctx, fmt.Sprintf("/configuration/timeperiods/%d", id), req)
+	if body.Exceptions == nil {
+		body.Exceptions = []any{}
+	}
+	return s.client.put(ctx, fmt.Sprintf("/configuration/timeperiods/%d", id), &body)
 }
 
 // Delete deletes a time period by ID.

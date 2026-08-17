@@ -211,8 +211,27 @@ func TestIntegration_OperationsAcknowledgeE2E(t *testing.T) {
 		failNotVisible(t, fmt.Sprintf("acknowledgement (comment %q) in Acknowledgements.ListForHost(%d)", comment, host.ID), perr)
 	}
 
-	if res, err := client.Monitoring.GetHost(ctx, host.ID); err == nil {
-		t.Logf("realtime is_acknowledged=%v (informational)", res.IsAcknowledged)
+	// #61: GetHost must decode the detail endpoint's top-level "acknowledged"
+	// flag (not the list-shaped "is_acknowledged") and derive HostID from the
+	// call argument. The realtime detail flag can lag the durable list by a few
+	// seconds, so poll for it.
+	var lastRes *MonitoringResource
+	ackReflected, perr2 := pollUntil(t, opsE2EPollTimeout, opsE2EPollInterval, func() (bool, error) {
+		res, err := client.Monitoring.GetHost(ctx, host.ID)
+		if err != nil {
+			return false, err
+		}
+		lastRes = res
+		return res.IsAcknowledged, nil
+	})
+	if lastRes != nil && lastRes.HostID != host.ID {
+		t.Errorf("GetHost.HostID = %d, want %d (must be derived from the request argument)", lastRes.HostID, host.ID)
+	}
+	if !ackReflected {
+		if lastRes != nil && !isHostProblem(lastRes.Status) {
+			t.Skipf("host %d recovered during the test; realtime acknowledgement not applicable", host.ID)
+		}
+		failNotVisible(t, fmt.Sprintf("GetHost(%d).IsAcknowledged", host.ID), perr2)
 	}
 }
 
