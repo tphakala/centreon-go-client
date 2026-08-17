@@ -4,8 +4,10 @@ package centreon
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 )
 
 // Integration tests require a live Centreon instance.
@@ -341,4 +343,220 @@ func TestIntegration_NotificationPolicy(t *testing.T) {
 	}
 	t.Logf("Host %d notification policy: enabled=%v, contacts=%d, groups=%d",
 		hostID, np.IsNotificationEnabled, len(np.Contacts), len(np.ContactGroups))
+}
+
+// --- Configuration write lifecycle: custom macro round-trip (#36, #13) ---
+//
+// These create real objects and clean them up with t.Cleanup (which runs even
+// after a t.Fatalf), so they are safe to run repeatedly. They exercise the
+// detail GET read path (HostService.Get / ServiceService.Get) that is the only
+// way to read custom macros back; the list endpoints do not return macros.
+//
+// Cleanup calls use context.Background(), not t.Context(), because t.Context()
+// is canceled before cleanup functions run, which would cancel the Delete.
+
+// defaultMonitoringServerID returns the default poller ID, or the first one.
+// It skips the test when the endpoint is unavailable or returns nothing.
+func defaultMonitoringServerID(t *testing.T, client *Client) int {
+	t.Helper()
+	resp, err := client.MonitoringServers.List(t.Context())
+	if err != nil {
+		t.Skipf("MonitoringServers.List: %v (may require admin permissions)", err)
+	}
+	if len(resp.Result) == 0 {
+		t.Skip("no monitoring servers available")
+	}
+	for i := range resp.Result {
+		if resp.Result[i].IsDefault {
+			return resp.Result[i].ID
+		}
+	}
+	return resp.Result[0].ID
+}
+
+// serviceCreatePrereq returns either a check command ID or a service template
+// ID for creating a service (exactly one is non-zero). A service requires one
+// of the two, and the client cannot create a check command, so the test is
+// skipped when the instance has neither.
+func serviceCreatePrereq(t *testing.T, client *Client) (checkCommandID, serviceTemplateID int) {
+	t.Helper()
+	cmds, err := client.Commands.List(t.Context(), WithLimit(200))
+	if err != nil {
+		t.Skipf("Commands.List: %v", err)
+	}
+	for i := range cmds.Result {
+		if cmds.Result[i].Type == 2 && cmds.Result[i].IsActivated { // type 2 = check command
+			return cmds.Result[i].ID, 0
+		}
+	}
+	tmpls, err := client.ServiceTemplates.List(t.Context(), WithLimit(1))
+	if err == nil && len(tmpls.Result) > 0 {
+		return 0, tmpls.Result[0].ID
+	}
+	t.Skip("no check command (type 2) or service template available to create a service")
+	return 0, 0
+}
+
+func findHostMacro(macros []HostMacro, name string) *HostMacro {
+	for i := range macros {
+		if macros[i].Name == name {
+			return &macros[i]
+		}
+	}
+	return nil
+}
+
+func findServiceMacro(macros []ServiceMacro, name string) *ServiceMacro {
+	for i := range macros {
+		if macros[i].Name == name {
+			return &macros[i]
+		}
+	}
+	return nil
+}
+
+// wantMacroValue asserts a *string macro value equals want, printing the actual
+// value rather than a pointer address on failure. Serves both HostMacro and
+// ServiceMacro, whose Value fields are both *string.
+func wantMacroValue(t *testing.T, macroName string, got *string, want string) {
+	t.Helper()
+	switch {
+	case got == nil:
+		t.Errorf("macro %s value = nil, want %q", macroName, want)
+	case *got != want:
+		t.Errorf("macro %s value = %q, want %q", macroName, *got, want)
+	}
+}
+
+// wantMaskedMacro asserts a password macro reads back masked: IsPassword true
+// and Value nil. Centreon masks secret macro values on read, so this pins the
+// masking contract that a plain-macro assertion (is_password == false, the bool
+// zero value) cannot.
+func wantMaskedMacro(t *testing.T, macroName string, isPassword bool, value *string) {
+	t.Helper()
+	if !isPassword {
+		t.Errorf("macro %s is_password = false, want true", macroName)
+	}
+	if value != nil {
+		t.Errorf("macro %s value = %q, want nil (password masked on read)", macroName, *value)
+	}
+}
+
+func TestIntegration_HostMacroLifecycle(t *testing.T) {
+	client := newIntegrationClient(t)
+	serverID := defaultMonitoringServerID(t, client)
+
+	name := fmt.Sprintf("go-it-host-%d", time.Now().UnixNano())
+	hostID, err := client.Hosts.Create(t.Context(), &CreateHostRequest{
+		MonitoringServerID: serverID,
+		Name:               name,
+		Address:            "127.0.0.1",
+		Macros: []Macro{
+			{Name: "GOITMACRO", Value: "roundtrip", IsPassword: false, Description: "integration test"},
+			{Name: "GOITSECRET", Value: "s3cret", IsPassword: true, Description: "secret"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Hosts.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.Hosts.Delete(context.Background(), hostID); err != nil {
+			t.Logf("cleanup: delete host %d: %v", hostID, err)
+		}
+	})
+	t.Logf("created host %d (%s)", hostID, name)
+
+	h, err := client.Hosts.Get(t.Context(), hostID)
+	if err != nil {
+		t.Fatalf("Hosts.Get(%d): %v", hostID, err)
+	}
+
+	m := findHostMacro(h.Macros, "GOITMACRO")
+	if m == nil {
+		t.Fatalf("macro GOITMACRO not found in %d returned macro(s)", len(h.Macros))
+	}
+	wantMacroValue(t, "GOITMACRO", m.Value, "roundtrip")
+	if m.IsPassword {
+		t.Errorf("macro GOITMACRO is_password = true, want false")
+	}
+	if m.Description != "integration test" {
+		t.Errorf("macro GOITMACRO description = %q, want %q", m.Description, "integration test")
+	}
+
+	secret := findHostMacro(h.Macros, "GOITSECRET")
+	if secret == nil {
+		t.Fatalf("macro GOITSECRET not found in %d returned macro(s)", len(h.Macros))
+	}
+	wantMaskedMacro(t, "GOITSECRET", secret.IsPassword, secret.Value)
+	t.Logf("host macro round-trip OK: %d macro(s) returned", len(h.Macros))
+}
+
+func TestIntegration_ServiceMacroLifecycle(t *testing.T) {
+	client := newIntegrationClient(t)
+	serverID := defaultMonitoringServerID(t, client)
+	checkCommandID, serviceTemplateID := serviceCreatePrereq(t, client)
+
+	hostName := fmt.Sprintf("go-it-svchost-%d", time.Now().UnixNano())
+	hostID, err := client.Hosts.Create(t.Context(), &CreateHostRequest{
+		MonitoringServerID: serverID,
+		Name:               hostName,
+		Address:            "127.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("Hosts.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.Hosts.Delete(context.Background(), hostID); err != nil {
+			t.Logf("cleanup: delete host %d: %v", hostID, err)
+		}
+	})
+
+	req := &CreateServiceRequest{
+		HostID: hostID,
+		Name:   fmt.Sprintf("go-it-svc-%d", time.Now().UnixNano()),
+		Macros: []Macro{
+			{Name: "GOITSVCMACRO", Value: "roundtrip", IsPassword: false, Description: "integration test"},
+			{Name: "GOITSVCSECRET", Value: "s3cret", IsPassword: true, Description: "secret"},
+		},
+	}
+	if checkCommandID != 0 {
+		req.CheckCommandID = checkCommandID
+	} else {
+		req.ServiceTemplateID = serviceTemplateID
+	}
+	svcID, err := client.Services.Create(t.Context(), req)
+	if err != nil {
+		t.Fatalf("Services.Create: %v", err)
+	}
+	// Registered after the host cleanup so LIFO deletes the service first.
+	t.Cleanup(func() {
+		if err := client.Services.Delete(context.Background(), svcID); err != nil {
+			t.Logf("cleanup: delete service %d: %v", svcID, err)
+		}
+	})
+	t.Logf("created service %d (%s) on host %d", svcID, req.Name, hostID)
+
+	svc, err := client.Services.Get(t.Context(), svcID)
+	if err != nil {
+		t.Fatalf("Services.Get(%d): %v", svcID, err)
+	}
+
+	m := findServiceMacro(svc.Macros, "GOITSVCMACRO")
+	if m == nil {
+		t.Fatalf("macro GOITSVCMACRO not found in %d returned macro(s)", len(svc.Macros))
+	}
+	wantMacroValue(t, "GOITSVCMACRO", m.Value, "roundtrip")
+	if m.IsPassword {
+		t.Errorf("macro GOITSVCMACRO is_password = true, want false")
+	}
+	if m.Description != "integration test" {
+		t.Errorf("macro GOITSVCMACRO description = %q, want %q", m.Description, "integration test")
+	}
+
+	secret := findServiceMacro(svc.Macros, "GOITSVCSECRET")
+	if secret == nil {
+		t.Fatalf("macro GOITSVCSECRET not found in %d returned macro(s)", len(svc.Macros))
+	}
+	wantMaskedMacro(t, "GOITSVCSECRET", secret.IsPassword, secret.Value)
+	t.Logf("service macro round-trip OK: %d macro(s) returned", len(svc.Macros))
 }
