@@ -841,3 +841,150 @@ func TestIntegration_OperationsRejectsMalformedBody(t *testing.T) {
 		})
 	}
 }
+
+// --- Configuration CRUD lifecycle for #57 (commands) and #58 (service
+// categories / groups). Categories and groups have a delete route, so they
+// round-trip Create -> Get -> Update -> Get and clean up. Commands have no
+// per-id route on 25.10 (no delete), so that test is reuse-safe instead. ---
+
+func TestIntegration_ServiceCategoryLifecycle(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	name := fmt.Sprintf("go-it-svccat-%d", time.Now().UnixNano())
+	id, err := client.ServiceCategories.Create(t.Context(), CreateServiceCategoryRequest{
+		Name:  name,
+		Alias: "GO IT category",
+	})
+	if err != nil {
+		t.Fatalf("ServiceCategories.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.ServiceCategories.Delete(context.Background(), id); err != nil {
+			t.Logf("cleanup: delete service category %d: %v", id, err)
+		}
+	})
+
+	cat, err := client.ServiceCategories.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("ServiceCategories.Get: %v", err)
+	}
+	if cat.ID != id {
+		t.Errorf("Get ID = %d, want %d", cat.ID, id)
+	}
+	if cat.Name != name {
+		t.Errorf("Get Name = %q, want %q", cat.Name, name)
+	}
+
+	const newAlias = "GO IT category updated"
+	if err := client.ServiceCategories.Update(t.Context(), id, UpdateServiceCategoryRequest{
+		Name:  name,
+		Alias: newAlias,
+	}); err != nil {
+		t.Fatalf("ServiceCategories.Update: %v", err)
+	}
+
+	cat2, err := client.ServiceCategories.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("ServiceCategories.Get (after update): %v", err)
+	}
+	if cat2.Alias != newAlias {
+		t.Errorf("Alias after update = %q, want %q", cat2.Alias, newAlias)
+	}
+}
+
+func TestIntegration_ServiceGroupLifecycle(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	name := fmt.Sprintf("go-it-svcgrp-%d", time.Now().UnixNano())
+	id, err := client.ServiceGroups.Create(t.Context(), CreateServiceGroupRequest{
+		Name:  name,
+		Alias: "GO IT group",
+	})
+	if err != nil {
+		t.Fatalf("ServiceGroups.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.ServiceGroups.Delete(context.Background(), id); err != nil {
+			t.Logf("cleanup: delete service group %d: %v", id, err)
+		}
+	})
+
+	sg, err := client.ServiceGroups.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("ServiceGroups.Get: %v", err)
+	}
+	if sg.ID != id {
+		t.Errorf("Get ID = %d, want %d", sg.ID, id)
+	}
+	if sg.Name != name {
+		t.Errorf("Get Name = %q, want %q", sg.Name, name)
+	}
+
+	const newAlias = "GO IT group updated"
+	if err := client.ServiceGroups.Update(t.Context(), id, UpdateServiceGroupRequest{
+		Name:  name,
+		Alias: newAlias,
+	}); err != nil {
+		t.Fatalf("ServiceGroups.Update: %v", err)
+	}
+
+	sg2, err := client.ServiceGroups.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("ServiceGroups.Get (after update): %v", err)
+	}
+	if sg2.Alias != newAlias {
+		t.Errorf("Alias after update = %q, want %q", sg2.Alias, newAlias)
+	}
+}
+
+func TestIntegration_CommandCreate(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	// Commands have no delete route on 25.10, so this test reuses a stable name
+	// rather than creating a fresh object every run.
+	const name = "go-it-check-command"
+
+	existing, err := client.Commands.List(t.Context(), WithSearch(Eq("name", name)))
+	if err != nil {
+		t.Fatalf("Commands.List: %v", err)
+	}
+	for i := range existing.Result {
+		if existing.Result[i].Name == name {
+			t.Logf("command %q already exists (id %d, type %d); reusing", name, existing.Result[i].ID, existing.Result[i].Type)
+			return
+		}
+	}
+
+	cmd, err := client.Commands.Create(t.Context(), CreateCommandRequest{
+		Name:        name,
+		Type:        2, // check command
+		CommandLine: "/usr/lib/nagios/plugins/check_ping -H $HOSTADDRESS$ -w 100,20% -c 500,60% -p 5",
+	})
+	if err != nil {
+		t.Fatalf("Commands.Create: %v", err)
+	}
+	if cmd.ID == 0 {
+		t.Fatal("Create returned a command with zero ID")
+	}
+	if cmd.Name != name {
+		t.Errorf("Name = %q, want %q", cmd.Name, name)
+	}
+	if cmd.Type != 2 {
+		t.Errorf("Type = %d, want 2", cmd.Type)
+	}
+
+	back, err := client.Commands.List(t.Context(), WithSearch(Eq("name", name)))
+	if err != nil {
+		t.Fatalf("Commands.List (readback): %v", err)
+	}
+	found := false
+	for i := range back.Result {
+		if back.Result[i].Name == name && back.Result[i].Type == 2 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("created command %q (type 2) not found on readback", name)
+	}
+}

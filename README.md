@@ -71,17 +71,19 @@ func main() {
 | Host Severities | yes | yes | yes | PUT | yes |
 | Host Templates | yes | by ID* | yes | PATCH | yes |
 | Services | yes | yes** | yes | PATCH | yes |
-| Service Groups | yes | - | yes | - | yes |
-| Service Categories | yes | - | yes | - | yes |
+| Service Groups | yes | yes | yes | PUT | yes |
+| Service Categories | yes | yes | yes | PUT | yes |
 | Service Severities | yes | - | yes | PUT | yes |
 | Service Templates | yes | by ID* | yes | PATCH | yes |
 | Time Periods | yes | yes | yes | PUT | yes |
-| Commands | yes | - | - | - | - |
+| Commands | yes | - | yes*** | - | - |
 | Monitoring Servers | yes | - | - | - | - |
 
 *\* by ID = filtered list lookup (API has no direct GET endpoint)*
 
 *\*\* `Get(ctx, id)` requires Centreon 25.10+ and returns the full configuration including custom macros (hosts: macros defined directly on the host; services: also includes macros inherited from service templates and commands). Earlier versions have no single-resource GET route and return an API error with HTTP status 404: on those versions use `GetByID` for hosts, and `ListByHost` for services (the services endpoint has no by-id lookup).*
+
+*\*\*\* `Commands.Create` returns the full `*Command`, not just an ID, because Centreon Web 25.10 exposes no per-id route for commands (GET/PUT/PATCH/DELETE on `/configuration/commands/{id}` return 404). There is therefore no `Get`, `Update`, or `Delete`, and a created command cannot be removed via the client.*
 
 ### User & Contact Management
 
@@ -102,6 +104,8 @@ func main() {
 | Downtimes | List, Get, Cancel, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
 | Acknowledgements | List, Get, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
 | Notification Policies | GetForHost, GetForService |
+
+*Notification policy reads may return an `*APIError` with HTTP 500 or 404 on some hosts on Centreon 25.10.x; this is a server-side defect on that version, not a client error.*
 
 ### Downtime Management
 
