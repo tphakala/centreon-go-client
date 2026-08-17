@@ -942,23 +942,36 @@ func TestIntegration_CommandCreate(t *testing.T) {
 
 	// Commands have no delete route on 25.10, so this test reuses a stable name
 	// rather than creating a fresh object every run.
-	const name = "go-it-check-command"
+	const (
+		name        = "go-it-check-command"
+		commandType = 2 // check command
+		commandLine = "/usr/lib/nagios/plugins/check_ping -H $HOSTADDRESS$ -w 100,20% -c 500,60% -p 5"
+	)
 
 	existing, err := client.Commands.List(t.Context(), WithSearch(Eq("name", name)))
 	if err != nil {
 		t.Fatalf("Commands.List: %v", err)
 	}
 	for i := range existing.Result {
-		if existing.Result[i].Name == name {
-			t.Logf("command %q already exists (id %d, type %d); reusing", name, existing.Result[i].ID, existing.Result[i].Type)
-			return
+		if existing.Result[i].Name != name {
+			continue
 		}
+		// The reserved test name is already taken (a prior run created it).
+		// Reuse it only when it matches the fixture; otherwise a wrong command
+		// would let this test pass without ever exercising Create, and it can
+		// neither be recreated (duplicate name) nor deleted (no delete route).
+		if existing.Result[i].Type != commandType || existing.Result[i].CommandLine != commandLine {
+			t.Fatalf("command %q exists but does not match the fixture (type=%d, command_line=%q); cannot reuse, recreate, or delete it",
+				name, existing.Result[i].Type, existing.Result[i].CommandLine)
+		}
+		t.Logf("command %q already exists (id %d, type %d); reusing", name, existing.Result[i].ID, existing.Result[i].Type)
+		return
 	}
 
 	cmd, err := client.Commands.Create(t.Context(), CreateCommandRequest{
 		Name:        name,
-		Type:        2, // check command
-		CommandLine: "/usr/lib/nagios/plugins/check_ping -H $HOSTADDRESS$ -w 100,20% -c 500,60% -p 5",
+		Type:        commandType,
+		CommandLine: commandLine,
 	})
 	if err != nil {
 		t.Fatalf("Commands.Create: %v", err)
@@ -969,8 +982,11 @@ func TestIntegration_CommandCreate(t *testing.T) {
 	if cmd.Name != name {
 		t.Errorf("Name = %q, want %q", cmd.Name, name)
 	}
-	if cmd.Type != 2 {
-		t.Errorf("Type = %d, want 2", cmd.Type)
+	if cmd.Type != commandType {
+		t.Errorf("Type = %d, want %d", cmd.Type, commandType)
+	}
+	if cmd.CommandLine != commandLine {
+		t.Errorf("CommandLine = %q, want %q", cmd.CommandLine, commandLine)
 	}
 
 	back, err := client.Commands.List(t.Context(), WithSearch(Eq("name", name)))
@@ -979,12 +995,12 @@ func TestIntegration_CommandCreate(t *testing.T) {
 	}
 	found := false
 	for i := range back.Result {
-		if back.Result[i].Name == name && back.Result[i].Type == 2 {
+		if back.Result[i].Name == name && back.Result[i].Type == commandType {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("created command %q (type 2) not found on readback", name)
+		t.Errorf("created command %q (type %d) not found on readback", name, commandType)
 	}
 }
