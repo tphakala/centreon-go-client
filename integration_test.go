@@ -191,7 +191,14 @@ func TestIntegration_MonitoringServerLastRestart(t *testing.T) {
 
 	resp, err := client.MonitoringServers.List(t.Context())
 	if err != nil {
-		t.Skipf("MonitoringServers.List: %v (may require admin permissions)", err)
+		// Skip only when the token genuinely lacks permission (401/403); a
+		// decode or transport error must fail, since catching a live decode
+		// regression on last_restart is the point of this test.
+		if apiErr, ok := errors.AsType[*APIError](err); ok &&
+			(apiErr.HTTPStatus == http.StatusUnauthorized || apiErr.HTTPStatus == http.StatusForbidden) {
+			t.Skipf("MonitoringServers.List: %v (token lacks permission)", err)
+		}
+		t.Fatalf("MonitoringServers.List: %v", err)
 	}
 	if len(resp.Result) == 0 {
 		t.Skip("no monitoring servers returned")
