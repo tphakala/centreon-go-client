@@ -7,11 +7,6 @@ import (
 )
 
 // ServiceTemplate represents a Centreon service template configuration resource.
-//
-// The host_templates relationship returned by /configuration/services/templates
-// is not modeled yet: its wire shape is unconfirmed (array of IDs vs array of
-// {id, name} objects), and mistyping it would fail the whole List decode. See
-// issue #22.
 type ServiceTemplate struct {
 	ID                  int    `json:"id"`
 	Name                string `json:"name"`
@@ -26,6 +21,13 @@ type ServiceTemplate struct {
 
 	ServiceTemplateID *int `json:"service_template_id"`
 	SeverityID        *int `json:"severity_id"`
+
+	// HostTemplates holds the IDs of the host templates this service template
+	// is attached to, as returned by /configuration/services/templates. The
+	// wire shape is a JSON array of bare integer IDs (e.g. [87, 88, 1053]),
+	// verified live against Centreon Web 24.10.29; an empty relationship
+	// arrives as [] and decodes to an empty slice. See issue #22.
+	HostTemplates []int `json:"host_templates,omitzero"`
 
 	ActiveCheckEnabled  int `json:"active_check_enabled"`
 	PassiveCheckEnabled int `json:"passive_check_enabled"`

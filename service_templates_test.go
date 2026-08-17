@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"testing"
 )
 
@@ -16,6 +17,7 @@ func TestServiceTemplateService_List_AllFields(t *testing.T) {
 				{
 					"id": 1, "name": "tpl-full", "is_locked": false,
 					"check_command_args":                    []string{"-c", "check_http"},
+					"host_templates":                        []int{87, 88, 1053},
 					"service_template_id":                   8,
 					"severity_id":                           7,
 					"active_check_enabled":                  2,
@@ -48,6 +50,7 @@ func TestServiceTemplateService_List_AllFields(t *testing.T) {
 				},
 				{
 					"id": 2, "name": "tpl-nulls", "is_locked": true,
+					"host_templates":      []int{},
 					"service_template_id": nil,
 					"severity_id":         nil,
 					"notification_type":   nil,
@@ -74,6 +77,9 @@ func TestServiceTemplateService_List_AllFields(t *testing.T) {
 
 	tpl := resp.Result[0]
 	wantStrSlice(t, "CheckCommandArgs", tpl.CheckCommandArgs, []string{"-c", "check_http"})
+	if !slices.Equal(tpl.HostTemplates, []int{87, 88, 1053}) {
+		t.Errorf("HostTemplates = %v, want [87 88 1053]", tpl.HostTemplates)
+	}
 	wantIntPtr(t, "ServiceTemplateID", tpl.ServiceTemplateID, 8)
 	wantIntPtr(t, "SeverityID", tpl.SeverityID, 7)
 	wantInt(t, "ActiveCheckEnabled", tpl.ActiveCheckEnabled, 2)
@@ -112,6 +118,42 @@ func TestServiceTemplateService_List_AllFields(t *testing.T) {
 	wantNilIntPtr(t, "Result[1].IconID", nulls.IconID)
 	wantInt(t, "Result[1].ActiveCheckEnabled", nulls.ActiveCheckEnabled, 0)
 	wantInt(t, "Result[1].VolatilityEnabled", nulls.VolatilityEnabled, 0)
+	if nulls.HostTemplates == nil || len(nulls.HostTemplates) != 0 {
+		t.Errorf("Result[1].HostTemplates = %v, want non-nil empty slice", nulls.HostTemplates)
+	}
+}
+
+// TestServiceTemplateService_List_HostTemplatesNullAndAbsent pins the two wire
+// shapes the populated/empty fixtures do not cover: a JSON null value and an
+// absent host_templates key must both decode to a nil slice without breaking
+// the List decode. The bare integer-array shape is verified live against
+// Centreon Web 24.10.29; these two cases are defensive.
+func TestServiceTemplateService_List_HostTemplatesNullAndAbsent(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/templates", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "name": "null-value", "host_templates": nil},
+				{"id": 2, "name": "absent-key"},
+			},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
+		})
+	})
+
+	resp, err := c.ServiceTemplates.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(resp.Result) != 2 {
+		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
+	}
+	if got := resp.Result[0].HostTemplates; got != nil {
+		t.Errorf("null-value HostTemplates = %v, want nil", got)
+	}
+	if got := resp.Result[1].HostTemplates; got != nil {
+		t.Errorf("absent-key HostTemplates = %v, want nil", got)
+	}
 }
 
 func TestServiceTemplateService_List(t *testing.T) {
