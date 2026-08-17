@@ -4,8 +4,11 @@ package centreon
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -559,4 +562,241 @@ func TestIntegration_ServiceMacroLifecycle(t *testing.T) {
 	}
 	wantMaskedMacro(t, "GOITSVCSECRET", secret.IsPassword, secret.Value)
 	t.Logf("service macro round-trip OK: %d macro(s) returned", len(svc.Macros))
+}
+
+// --- Operations (bulk monitoring actions) body-format validation ---
+
+// syntheticResourceID is an assumed-nonexistent host ID used by the operations
+// body-format tests. Centreon assigns small sequential host IDs, so this large
+// sentinel is far above any real ID and will not collide on a live instance; on
+// a fresh box (0 configured hosts) nothing exists at all. The operations
+// therefore act on no real resource: acknowledge/check/comments no-op (204) and
+// downtime/submit fail the resource lookup (404).
+const syntheticResourceID = 999000001
+
+// schemaValidationMarkers are lowercased substrings that the Centreon JSON
+// schema validator emits when a request body has the wrong shape. They appear
+// in the HTTP 500 response to a malformed operations body, e.g.
+// "[acknowledgement] The property acknowledgement is required / The property
+// comment is not defined and the definition does not allow additional
+// properties". A resource-not-found body ("Host not found") contains none of
+// them, so a 404 is not misclassified as a schema error.
+var schemaValidationMarkers = []string{
+	"is required",
+	"additional properties",
+	"not defined",
+	"does not allow",
+}
+
+// isSchemaValidationError reports whether apiErr is a request-body JSON schema
+// rejection: the signal that a bulk-operation body has the wrong shape. Only
+// the negative control uses it, to confirm that a deliberately malformed body
+// is rejected for the expected reason. The positive assertion below deliberately
+// does NOT depend on message matching (see assertBodyFormatAccepted).
+func isSchemaValidationError(apiErr *APIError) bool {
+	switch apiErr.HTTPStatus {
+	case http.StatusBadRequest, http.StatusUnprocessableEntity, http.StatusInternalServerError:
+		msg := strings.ToLower(apiErr.Message)
+		for _, marker := range schemaValidationMarkers {
+			if strings.Contains(msg, marker) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// assertBodyFormatAccepted verifies that the live API accepted the request body
+// STRUCTURE that an OperationsService method produced. A well-formed request is
+// either applied (HTTP 204 -> nil error) or passes schema validation and then
+// fails the resource-existence lookup for the absent synthetic target (HTTP
+// 404). Any other status fails the test: 401/403 as an auth/permission error
+// that blocks validation (fatal), and everything else (a 400/422/500 schema
+// rejection) as a wrong nested-vs-flat wire format. Keying on 204/404 rather
+// than on matching a schema-error message avoids a false pass when a broken
+// body yields an error message this test does not recognize.
+func assertBodyFormatAccepted(t *testing.T, op string, err error) {
+	t.Helper()
+	if err == nil {
+		t.Logf("%s: body accepted (HTTP 204 no-op)", op)
+		return
+	}
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok {
+		t.Fatalf("%s: non-API error (transport/network?): %v", op, err)
+	}
+	switch apiErr.HTTPStatus {
+	case http.StatusNotFound:
+		// Body passed schema validation; only the resource lookup failed
+		// (expected on an engine-less box where nothing is monitored).
+		t.Logf("%s: body accepted by schema, resource lookup failed as expected (HTTP 404): %s",
+			op, apiErr.Message)
+	case http.StatusUnauthorized, http.StatusForbidden:
+		t.Fatalf("%s: auth/permission error (HTTP %d): %s; cannot validate body format",
+			op, apiErr.HTTPStatus, apiErr.Message)
+	default:
+		t.Errorf("%s: body rejected (HTTP %d): %s; want 204 or 404, so the nested-vs-flat wire format is wrong",
+			op, apiErr.HTTPStatus, apiErr.Message)
+	}
+}
+
+// TestIntegration_OperationsBodyFormat validates that the five OperationsService
+// methods send the request body the Centreon API expects, answering the open
+// nested-vs-flat question in issue #13. Three of the five nest their parameters
+// in a sibling object next to the resource list (acknowledge -> "acknowledgement",
+// check -> "check", downtime -> "downtime"); the other two embed their
+// parameters into each element of the "resources" array (submit -> status/output,
+// comments -> comment/date). In every case the parameters are NOT flat at the
+// top level, which is the shape a flat (wrong) body would use.
+//
+// Verified live behavior (local podman Centreon Web 25.10.16, 2026-08-17), with
+// the synthetic target absent (0 configured hosts on a fresh instance):
+//   - acknowledge, check, comments: the correct body returns HTTP 204 (accepted,
+//     applied as a no-op against the absent resource).
+//   - downtime, submit: the correct body returns HTTP 404 "Host not found". The
+//     server validates the request body schema before it resolves the target
+//     resource, so a 404 (resource missing) means the body was schema-accepted.
+//     That ordering is proven by TestIntegration_OperationsRejectsMalformedBody,
+//     which shows a malformed body on these same endpoints is rejected with an
+//     HTTP 500 schema error, not a 404.
+//
+// The test asserts only that the body STRUCTURE is accepted (204 or 404, both
+// portable across instances), not that downtime and submit are applied
+// end-to-end against a monitored resource (that needs a running monitoring
+// engine, which a fresh box does not have).
+func TestIntegration_OperationsBodyFormat(t *testing.T) {
+	client := newIntegrationClient(t)
+	uniq := fmt.Sprintf("go-it-bodyfmt-%d", time.Now().UnixNano())
+	ref := ResourceRef{Type: "host", ID: syntheticResourceID}
+
+	t.Run("acknowledge", func(t *testing.T) {
+		err := client.Operations.Acknowledge(t.Context(), &AcknowledgeRequest{
+			Resources: []ResourceRef{ref},
+			Comment:   uniq,
+			IsSticky:  true,
+		})
+		assertBodyFormatAccepted(t, "acknowledge", err)
+	})
+
+	t.Run("check", func(t *testing.T) {
+		err := client.Operations.Check(t.Context(), &CheckRequest{
+			Resources: []ResourceRef{ref},
+		})
+		assertBodyFormatAccepted(t, "check", err)
+	})
+
+	t.Run("comment", func(t *testing.T) {
+		err := client.Operations.Comment(t.Context(), &CommentRequest{
+			Resources: []ResourceRef{ref},
+			Comment:   uniq,
+		})
+		assertBodyFormatAccepted(t, "comment", err)
+	})
+
+	t.Run("downtime", func(t *testing.T) {
+		now := time.Now()
+		err := client.Operations.Downtime(t.Context(), &DowntimeRequest{
+			Resources: []ResourceRef{ref},
+			Comment:   uniq,
+			StartTime: now,
+			EndTime:   now.Add(time.Hour),
+			Fixed:     true,
+			Duration:  3600,
+		})
+		assertBodyFormatAccepted(t, "downtime", err)
+	})
+
+	t.Run("submit", func(t *testing.T) {
+		err := client.Operations.Submit(t.Context(), &SubmitResultRequest{
+			Resources: []SubmitResource{{
+				Type:   "host",
+				ID:     syntheticResourceID,
+				Status: 0,
+				Output: uniq,
+			}},
+		})
+		assertBodyFormatAccepted(t, "submit", err)
+	})
+}
+
+// TestIntegration_OperationsRejectsMalformedBody is the negative control for
+// TestIntegration_OperationsBodyFormat: it proves the 204/404 acceptance signal
+// is not vacuous by sending a deliberately malformed body to each of the three
+// wire shapes and asserting the live API rejects it as a JSON schema error. It
+// deliberately covers the two operations whose accept signal is a 404 (downtime
+// and submit), so a malformed body on those endpoints is shown to fail with a
+// schema error rather than the same 404 the positive test treats as accepted.
+// The three malformed shapes:
+//   - acknowledge: the "acknowledgement" sibling wrapper removed, its fields
+//     hoisted to the top level.
+//   - downtime: the "downtime" sibling wrapper removed, its fields hoisted.
+//   - submit: the per-resource status/output hoisted to the top level instead
+//     of embedded in each "resources" element.
+//
+// Verified live (Centreon 25.10.16, 2026-08-17): all three return HTTP 500 with
+// a schema message, which confirms the server validates the request body schema
+// before it resolves the target resource.
+func TestIntegration_OperationsRejectsMalformedBody(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	ref := map[string]any{"type": "host", "id": syntheticResourceID, "parent": nil}
+	now := time.Now().UTC()
+	cases := []struct {
+		name string
+		path string
+		body map[string]any
+	}{
+		{
+			name: "acknowledge_flat",
+			path: "/monitoring/resources/acknowledge",
+			body: map[string]any{
+				"resources":             []map[string]any{ref},
+				"comment":               "go-it-malformed-negative-control",
+				"is_notify_contacts":    false,
+				"is_persistent_comment": false,
+				"is_sticky":             true,
+			},
+		},
+		{
+			name: "downtime_flat",
+			path: "/monitoring/resources/downtime",
+			body: map[string]any{
+				"resources":  []map[string]any{ref},
+				"comment":    "go-it-malformed-negative-control",
+				"start_time": now.Format(time.RFC3339),
+				"end_time":   now.Add(time.Hour).Format(time.RFC3339),
+				"is_fixed":   true,
+				"duration":   0,
+			},
+		},
+		{
+			name: "submit_hoisted",
+			path: "/monitoring/resources/submit",
+			body: map[string]any{
+				"resources": []map[string]any{ref},
+				"status":    0,
+				"output":    "go-it-malformed-negative-control",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// client.post runs the full request path (auth header, 401 re-auth,
+			// body close) and returns the parsed *APIError.
+			err := client.post(t.Context(), tc.path, tc.body, nil)
+			if err == nil {
+				t.Fatalf("%s: malformed body was ACCEPTED (nil error); the accept signal is vacuous", tc.name)
+			}
+			apiErr, ok := errors.AsType[*APIError](err)
+			if !ok {
+				t.Fatalf("%s: expected *APIError, got %v", tc.name, err)
+			}
+			if !isSchemaValidationError(apiErr) {
+				t.Errorf("%s: malformed body rejected but not as a schema error (HTTP %d): %s; expected a JSON schema validation failure",
+					tc.name, apiErr.HTTPStatus, apiErr.Message)
+			}
+			t.Logf("%s: correctly rejected as schema error (HTTP %d): %s", tc.name, apiErr.HTTPStatus, apiErr.Message)
+		})
+	}
 }
