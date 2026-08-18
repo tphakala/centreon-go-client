@@ -66,6 +66,11 @@ type Client struct {
 	NotificationPolicies *NotificationPolicyService
 	Downtimes            *DowntimeService
 	Acknowledgements     *AcknowledgementService
+
+	// Read-only configuration lookups (list-only; no per-id or write routes).
+	Connectors   *ConnectorService
+	Icons        *IconService
+	AccessGroups *AccessGroupService
 }
 
 // Option configures a Client.
@@ -118,6 +123,9 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.NotificationPolicies = &NotificationPolicyService{client: c}
 	c.Downtimes = &DowntimeService{client: c}
 	c.Acknowledgements = &AcknowledgementService{client: c}
+	c.Connectors = &ConnectorService{client: c}
+	c.Icons = &IconService{client: c}
+	c.AccessGroups = &AccessGroupService{client: c}
 	return c, nil
 }
 
