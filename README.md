@@ -69,21 +69,26 @@ func main() {
 | Host Groups | yes | yes | yes | PUT | yes |
 | Host Categories | yes | yes | yes | PUT | yes |
 | Host Severities | yes | yes | yes | PUT | yes |
-| Host Templates | yes | by ID* | yes | PATCH | yes |
+| Host Templates | yes | yes** / by ID* | yes | PATCH | yes |
 | Services | yes | yes** | yes | PATCH | yes |
 | Service Groups | yes | yes | yes | PUT | yes |
 | Service Categories | yes | yes | yes | PUT | yes |
 | Service Severities | yes | - | yes | PUT | yes |
-| Service Templates | yes | by ID* | yes | PATCH | yes |
+| Service Templates | yes | yes** / by ID* | yes | PATCH | yes |
 | Time Periods | yes | yes | yes | PUT | yes |
 | Commands | yes | - | yes*** | - | - |
 | Monitoring Servers | yes | - | - | - | - |
+| Access Groups**** | yes | - | - | - | - |
+| Connectors**** | yes | - | - | - | - |
+| Icons**** | yes | - | - | - | - |
 
 *\* by ID = filtered list lookup (API has no direct GET endpoint)*
 
-*\*\* `Get(ctx, id)` requires Centreon 25.10+ and returns the full configuration including custom macros (hosts: macros defined directly on the host; services: also includes macros inherited from service templates and commands). Earlier versions have no single-resource GET route and return an API error with HTTP status 404: on those versions use `GetByID` for hosts, and `ListByHost` for services (the services endpoint has no by-id lookup).*
+*\*\* `Get(ctx, id)` requires Centreon 25.10+ and returns the full configuration including custom macros (hosts: macros defined directly on the host; services: also includes macros inherited from service templates and commands). Host and service templates likewise expose a 25.10+ `Get(ctx, id)` returning the full template with its macros plus category and parent-template (host) or category and group (service) relationships that the list endpoint omits. Earlier versions have no single-resource GET route and return an API error with HTTP status 404: on those versions use `GetByID` for hosts and templates, and `ListByHost` for services (the services endpoint has no by-id lookup).*
 
 *\*\*\* `Commands.Create` returns the full `*Command`, not just an ID, because Centreon Web 25.10 exposes no per-id route for commands (GET/PUT/PATCH/DELETE on `/configuration/commands/{id}` return 404). There is therefore no `Get`, `Update`, or `Delete`, and a created command cannot be removed via the client.*
+
+*\*\*\*\* Read-only lookups exposed by Centreon Web 25.10: `List` and `All` only, with no per-id, create, update, or delete route (POST returns HTTP 405). The Icons list is empty on a stock install because the media library is unpopulated.*
 
 ### User & Contact Management
 

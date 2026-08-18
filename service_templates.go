@@ -65,6 +65,72 @@ type ServiceTemplate struct {
 	IsLocked bool `json:"is_locked"`
 }
 
+// ServiceTemplateDetail is the full service template configuration returned by
+// ServiceTemplateService.Get (GET /configuration/services/templates/{id}) on
+// Centreon 25.10+. It carries every field of the list representation
+// (ServiceTemplate) plus the categories, service groups, and custom macros that
+// the list endpoint omits. Unlike a host template, a service template has no
+// parent-templates relationship object (only the scalar ServiceTemplateID). The
+// fields are redeclared flat (rather than embedding ServiceTemplate) to match
+// HostDetail/ServiceDetail and to insulate the detail model from any future
+// drift in the list endpoint.
+type ServiceTemplateDetail struct {
+	ID                  int    `json:"id"`
+	Name                string `json:"name"`
+	Alias               string `json:"alias,omitzero"`
+	CheckCommandID      *int   `json:"check_command_id"`
+	CheckTimeperiodID   *int   `json:"check_timeperiod_id"`
+	MaxCheckAttempts    *int   `json:"max_check_attempts"`
+	NormalCheckInterval *int   `json:"normal_check_interval"`
+	RetryCheckInterval  *int   `json:"retry_check_interval"`
+
+	CheckCommandArgs []string `json:"check_command_args,omitzero"`
+
+	ServiceTemplateID *int `json:"service_template_id"`
+	SeverityID        *int `json:"severity_id"`
+
+	HostTemplates []int `json:"host_templates,omitzero"`
+
+	ActiveCheckEnabled  int `json:"active_check_enabled"`
+	PassiveCheckEnabled int `json:"passive_check_enabled"`
+	VolatilityEnabled   int `json:"volatility_enabled"`
+
+	NotificationEnabled               int  `json:"notification_enabled"`
+	IsContactAdditiveInheritance      bool `json:"is_contact_additive_inheritance"`
+	IsContactGroupAdditiveInheritance bool `json:"is_contact_group_additive_inheritance"`
+	NotificationInterval              *int `json:"notification_interval"`
+	NotificationTimeperiodID          *int `json:"notification_timeperiod_id"`
+	NotificationType                  *int `json:"notification_type"`
+	FirstNotificationDelay            *int `json:"first_notification_delay"`
+	RecoveryNotificationDelay         *int `json:"recovery_notification_delay"`
+	AcknowledgementTimeout            *int `json:"acknowledgement_timeout"`
+
+	FreshnessChecked   int  `json:"freshness_checked"`
+	FreshnessThreshold *int `json:"freshness_threshold"`
+
+	FlapDetectionEnabled int  `json:"flap_detection_enabled"`
+	LowFlapThreshold     *int `json:"low_flap_threshold"`
+	HighFlapThreshold    *int `json:"high_flap_threshold"`
+
+	EventHandlerEnabled     int      `json:"event_handler_enabled"`
+	EventHandlerCommandID   *int     `json:"event_handler_command_id"`
+	EventHandlerCommandArgs []string `json:"event_handler_command_args,omitzero"`
+
+	GraphTemplateID *int   `json:"graph_template_id"`
+	NoteURL         string `json:"note_url,omitzero"`
+	Note            string `json:"note,omitzero"`
+	ActionURL       string `json:"action_url,omitzero"`
+	IconID          *int   `json:"icon_id"`
+	IconAlternative string `json:"icon_alternative,omitzero"`
+	Comment         string `json:"comment,omitzero"`
+
+	IsLocked bool `json:"is_locked"`
+
+	Categories []NamedRef     `json:"categories,omitzero"`
+	Groups     []NamedRef     `json:"groups,omitzero"`
+	Macros     []ServiceMacro `json:"macros,omitzero"`
+}
+
 // CreateServiceTemplateRequest is the request body for creating a service template.
 type CreateServiceTemplateRequest struct {
 	Name           string `json:"name"`
@@ -105,6 +171,23 @@ func (s *ServiceTemplateService) All(ctx context.Context, opts ...ListOption) it
 // Returns *NotFoundError if not found.
 func (s *ServiceTemplateService) GetByID(ctx context.Context, id int) (*ServiceTemplate, error) {
 	return getByID(ctx, s.List, "service template", id)
+}
+
+// Get returns the full service template configuration for the given ID using a
+// direct GET request, including categories, service groups, and custom macros.
+// A macro's Value is nil when its IsPassword is true because the API masks
+// password values on read.
+//
+// This requires Centreon 25.10 or later; earlier versions have no
+// single-resource GET route for templates and return an *APIError with HTTP
+// status 404. For a version-independent lookup of the list representation
+// (without the extra detail fields), use GetByID.
+func (s *ServiceTemplateService) Get(ctx context.Context, id int) (*ServiceTemplateDetail, error) {
+	var t ServiceTemplateDetail
+	if err := s.client.get(ctx, fmt.Sprintf("/configuration/services/templates/%d", id), &t); err != nil {
+		return nil, err
+	}
+	return &t, nil
 }
 
 // Create creates a new service template and returns its ID.

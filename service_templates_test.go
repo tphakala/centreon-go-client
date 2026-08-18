@@ -250,6 +250,167 @@ func TestServiceTemplateService_GetByID_NotFound(t *testing.T) {
 	}
 }
 
+func TestServiceTemplateService_Get(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	// A live service-template detail returns [] for categories and groups on a
+	// bare template; the fixture deliberately populates them so the decode is
+	// asserted and the field lines are sabotage-verifiable. Service-template
+	// macros carry no id (unlike host-template macros).
+	// The detail struct redeclares every ServiceTemplate base field flat, so this
+	// fixture populates and asserts the full base surface, not just the extra
+	// detail relationships; a json-tag typo on any redeclared field would
+	// otherwise ship green. graph_template_id is left null to pin the nullable
+	// path. Service-template macros carry no id (unlike host-template macros).
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/templates/42", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":                                    42,
+			"name":                                  "generic-service",
+			"alias":                                 "Generic",
+			"check_command_id":                      5,
+			"check_timeperiod_id":                   6,
+			"max_check_attempts":                    3,
+			"normal_check_interval":                 5,
+			"retry_check_interval":                  1,
+			"service_template_id":                   7,
+			"severity_id":                           8,
+			"host_templates":                        []int{88, 91},
+			"active_check_enabled":                  2,
+			"passive_check_enabled":                 1,
+			"volatility_enabled":                    2,
+			"notification_enabled":                  2,
+			"is_contact_additive_inheritance":       true,
+			"is_contact_group_additive_inheritance": true,
+			"notification_interval":                 10,
+			"notification_timeperiod_id":            4,
+			"notification_type":                     3,
+			"first_notification_delay":              30,
+			"recovery_notification_delay":           15,
+			"acknowledgement_timeout":               60,
+			"freshness_checked":                     1,
+			"freshness_threshold":                   120,
+			"flap_detection_enabled":                2,
+			"low_flap_threshold":                    20,
+			"high_flap_threshold":                   80,
+			"event_handler_enabled":                 1,
+			"event_handler_command_id":              9,
+			"graph_template_id":                     nil,
+			"note_url":                              "http://note",
+			"note":                                  "a note",
+			"action_url":                            "http://action",
+			"icon_id":                               11,
+			"icon_alternative":                      "alt",
+			"comment":                               "a comment",
+			"is_locked":                             false,
+			"categories": []map[string]any{
+				{"id": 3, "name": "ping"},
+			},
+			"groups": []map[string]any{
+				{"id": 4, "name": "web-services"},
+			},
+			"macros": []map[string]any{
+				{"name": "WARN", "value": "80", "is_password": false, "description": "warn"},
+				{"name": "SECRET", "value": nil, "is_password": true, "description": ""},
+			},
+		})
+	})
+
+	tmpl, err := c.ServiceTemplates.Get(t.Context(), 42)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	wantInt(t, "ID", tmpl.ID, 42)
+	wantStr(t, "Name", tmpl.Name, "generic-service")
+
+	// Redeclared base fields: pin every tag so a Detail-only typo cannot hide.
+	wantStr(t, "Alias", tmpl.Alias, "Generic")
+	wantIntPtr(t, "CheckCommandID", tmpl.CheckCommandID, 5)
+	wantIntPtr(t, "CheckTimeperiodID", tmpl.CheckTimeperiodID, 6)
+	wantIntPtr(t, "MaxCheckAttempts", tmpl.MaxCheckAttempts, 3)
+	wantIntPtr(t, "NormalCheckInterval", tmpl.NormalCheckInterval, 5)
+	wantIntPtr(t, "RetryCheckInterval", tmpl.RetryCheckInterval, 1)
+	wantIntPtr(t, "ServiceTemplateID", tmpl.ServiceTemplateID, 7)
+	wantIntPtr(t, "SeverityID", tmpl.SeverityID, 8)
+	if !slices.Equal(tmpl.HostTemplates, []int{88, 91}) {
+		t.Errorf("HostTemplates = %v, want [88 91]", tmpl.HostTemplates)
+	}
+	wantInt(t, "ActiveCheckEnabled", tmpl.ActiveCheckEnabled, 2)
+	wantInt(t, "PassiveCheckEnabled", tmpl.PassiveCheckEnabled, 1)
+	wantInt(t, "VolatilityEnabled", tmpl.VolatilityEnabled, 2)
+	wantInt(t, "NotificationEnabled", tmpl.NotificationEnabled, 2)
+	wantBool(t, "IsContactAdditiveInheritance", tmpl.IsContactAdditiveInheritance, true)
+	wantBool(t, "IsContactGroupAdditiveInheritance", tmpl.IsContactGroupAdditiveInheritance, true)
+	wantIntPtr(t, "NotificationInterval", tmpl.NotificationInterval, 10)
+	wantIntPtr(t, "NotificationTimeperiodID", tmpl.NotificationTimeperiodID, 4)
+	wantIntPtr(t, "NotificationType", tmpl.NotificationType, 3)
+	wantIntPtr(t, "FirstNotificationDelay", tmpl.FirstNotificationDelay, 30)
+	wantIntPtr(t, "RecoveryNotificationDelay", tmpl.RecoveryNotificationDelay, 15)
+	wantIntPtr(t, "AcknowledgementTimeout", tmpl.AcknowledgementTimeout, 60)
+	wantInt(t, "FreshnessChecked", tmpl.FreshnessChecked, 1)
+	wantIntPtr(t, "FreshnessThreshold", tmpl.FreshnessThreshold, 120)
+	wantInt(t, "FlapDetectionEnabled", tmpl.FlapDetectionEnabled, 2)
+	wantIntPtr(t, "LowFlapThreshold", tmpl.LowFlapThreshold, 20)
+	wantIntPtr(t, "HighFlapThreshold", tmpl.HighFlapThreshold, 80)
+	wantInt(t, "EventHandlerEnabled", tmpl.EventHandlerEnabled, 1)
+	wantIntPtr(t, "EventHandlerCommandID", tmpl.EventHandlerCommandID, 9)
+	wantNilIntPtr(t, "GraphTemplateID", tmpl.GraphTemplateID)
+	wantStr(t, "NoteURL", tmpl.NoteURL, "http://note")
+	wantStr(t, "Note", tmpl.Note, "a note")
+	wantStr(t, "ActionURL", tmpl.ActionURL, "http://action")
+	wantIntPtr(t, "IconID", tmpl.IconID, 11)
+	wantStr(t, "IconAlternative", tmpl.IconAlternative, "alt")
+	wantStr(t, "Comment", tmpl.Comment, "a comment")
+	wantBool(t, "IsLocked", tmpl.IsLocked, false)
+
+	if len(tmpl.Categories) != 1 {
+		t.Fatalf("len(Categories) = %d, want 1", len(tmpl.Categories))
+	}
+	wantInt(t, "Categories[0].ID", tmpl.Categories[0].ID, 3)
+	wantStr(t, "Categories[0].Name", tmpl.Categories[0].Name, "ping")
+
+	if len(tmpl.Groups) != 1 {
+		t.Fatalf("len(Groups) = %d, want 1", len(tmpl.Groups))
+	}
+	wantInt(t, "Groups[0].ID", tmpl.Groups[0].ID, 4)
+	wantStr(t, "Groups[0].Name", tmpl.Groups[0].Name, "web-services")
+
+	if len(tmpl.Macros) != 2 {
+		t.Fatalf("len(Macros) = %d, want 2", len(tmpl.Macros))
+	}
+	wantStr(t, "Macros[0].Name", tmpl.Macros[0].Name, "WARN")
+	if tmpl.Macros[0].Value == nil || *tmpl.Macros[0].Value != "80" {
+		t.Errorf("Macros[0].Value = %v, want 80", tmpl.Macros[0].Value)
+	}
+	// A masked password macro decodes to a nil Value pointer.
+	wantBool(t, "Macros[1].IsPassword", tmpl.Macros[1].IsPassword, true)
+	if tmpl.Macros[1].Value != nil {
+		t.Errorf("Macros[1].Value = %q, want nil (password masked)", *tmpl.Macros[1].Value)
+	}
+}
+
+func TestServiceTemplateService_Get_NotFound(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("GET /centreon/api/latest/configuration/services/templates/999", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"code": 404, "message": "ServiceTemplate not found"})
+	})
+
+	tmpl, err := c.ServiceTemplates.Get(t.Context(), 999)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if tmpl != nil {
+		t.Errorf("expected nil template, got %+v", tmpl)
+	}
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T: %v", err, err)
+	}
+	if apiErr.HTTPStatus != 404 {
+		t.Errorf("APIError.HTTPStatus = %d, want 404", apiErr.HTTPStatus)
+	}
+}
+
 func TestServiceTemplateService_Create(t *testing.T) {
 	mux, c := newTestMux(t)
 

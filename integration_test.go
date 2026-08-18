@@ -1096,3 +1096,114 @@ func TestIntegration_TimePeriodUpdateExceptions(t *testing.T) {
 		t.Errorf("Alias after update = %q, want %q", tp.Alias, newAlias)
 	}
 }
+
+func TestIntegration_HostTemplateGet(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	name := fmt.Sprintf("go-it-htpl-%d", time.Now().UnixNano())
+	id, err := client.HostTemplates.Create(t.Context(), CreateHostTemplateRequest{
+		Name:  name,
+		Alias: "GO IT host template",
+	})
+	if err != nil {
+		t.Fatalf("HostTemplates.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.HostTemplates.Delete(context.Background(), id); err != nil {
+			t.Logf("cleanup: delete host template %d: %v", id, err)
+		}
+	})
+
+	detail, err := client.HostTemplates.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("HostTemplates.Get(%d): %v", id, err)
+	}
+	if detail.ID != id {
+		t.Errorf("Get ID = %d, want %d", detail.ID, id)
+	}
+	if detail.Name != name {
+		t.Errorf("Get Name = %q, want %q", detail.Name, name)
+	}
+	// A freshly created bare template carries no relationships; asserting the
+	// detail decodes cleanly is the point here (the populated-relationship
+	// decode is pinned by the unit test, since CreateHostTemplateRequest exposes
+	// only Name/Alias/CheckCommandID).
+	t.Logf("host template %d detail OK: %d categories, %d parent templates, %d macros",
+		id, len(detail.Categories), len(detail.Templates), len(detail.Macros))
+}
+
+func TestIntegration_ServiceTemplateGet(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	name := fmt.Sprintf("go-it-stpl-%d", time.Now().UnixNano())
+	id, err := client.ServiceTemplates.Create(t.Context(), CreateServiceTemplateRequest{
+		Name:  name,
+		Alias: "GO IT service template",
+	})
+	if err != nil {
+		t.Fatalf("ServiceTemplates.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.ServiceTemplates.Delete(context.Background(), id); err != nil {
+			t.Logf("cleanup: delete service template %d: %v", id, err)
+		}
+	})
+
+	detail, err := client.ServiceTemplates.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("ServiceTemplates.Get(%d): %v", id, err)
+	}
+	if detail.ID != id {
+		t.Errorf("Get ID = %d, want %d", detail.ID, id)
+	}
+	if detail.Name != name {
+		t.Errorf("Get Name = %q, want %q", detail.Name, name)
+	}
+	t.Logf("service template %d detail OK: %d categories, %d groups, %d macros",
+		id, len(detail.Categories), len(detail.Groups), len(detail.Macros))
+}
+
+func TestIntegration_ListConnectors(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	resp, err := client.Connectors.List(t.Context())
+	if err != nil {
+		t.Fatalf("Connectors.List: %v", err)
+	}
+	t.Logf("Found %d connectors (total: %d)", len(resp.Result), resp.Meta.Total)
+}
+
+func TestIntegration_ListAccessGroups(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	resp, err := client.AccessGroups.List(t.Context())
+	if err != nil {
+		t.Fatalf("AccessGroups.List: %v", err)
+	}
+	// The built-in "ALL" access group exists on every Centreon install, so this
+	// asserts real decoded content rather than only that the call succeeded.
+	found := false
+	for _, g := range resp.Result {
+		if g.Name == "ALL" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected the built-in \"ALL\" access group among %d result(s)", len(resp.Result))
+	}
+	t.Logf("Found %d access groups (total: %d)", len(resp.Result), resp.Meta.Total)
+}
+
+func TestIntegration_ListIcons(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	// A stock Centreon install has an empty media library (view_img), so the
+	// list is often empty; the test asserts only that the call succeeds and the
+	// response decodes.
+	resp, err := client.Icons.List(t.Context())
+	if err != nil {
+		t.Fatalf("Icons.List: %v", err)
+	}
+	t.Logf("Found %d icons (total: %d)", len(resp.Result), resp.Meta.Total)
+}
