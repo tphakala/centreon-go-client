@@ -4,6 +4,7 @@ package centreon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1206,4 +1207,139 @@ func TestIntegration_ListIcons(t *testing.T) {
 		t.Fatalf("Icons.List: %v", err)
 	}
 	t.Logf("Found %d icons (total: %d)", len(resp.Result), resp.Meta.Total)
+}
+
+func TestIntegration_AgentConfigurationLifecycle(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	name := fmt.Sprintf("go-it-agentcfg-%d", time.Now().UnixNano())
+	conf := json.RawMessage(`{"otel_public_certificate":"/etc/pki/pub.crt","otel_ca_certificate":"/etc/pki/ca.crt","otel_private_key":"/etc/pki/priv.key","conf_server_port":1443,"conf_certificate":"/etc/pki/conf.crt","conf_private_key":"/etc/pki/conf.key"}`)
+
+	id, err := client.AgentConfigurations.Create(t.Context(), &CreateAgentConfigurationRequest{
+		Type: "telegraf", Name: name, ConnectionMode: "secure",
+		PollerIDs: []int{1}, Configuration: conf,
+	})
+	if err != nil {
+		t.Fatalf("AgentConfigurations.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.AgentConfigurations.Delete(context.Background(), id); err != nil {
+			t.Logf("cleanup: delete agent configuration %d: %v", id, err)
+		}
+	})
+
+	ac, err := client.AgentConfigurations.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("AgentConfigurations.Get: %v", err)
+	}
+	if ac.ID != id {
+		t.Errorf("Get ID = %d, want %d", ac.ID, id)
+	}
+	if ac.Name != name {
+		t.Errorf("Get Name = %q, want %q", ac.Name, name)
+	}
+	if ac.Type != "telegraf" {
+		t.Errorf("Get Type = %q, want telegraf", ac.Type)
+	}
+	if ac.ConnectionMode != "secure" {
+		t.Errorf("Get ConnectionMode = %q, want secure", ac.ConnectionMode)
+	}
+	if len(ac.Configuration) == 0 {
+		t.Error("Get Configuration is empty, want the telegraf config object")
+	}
+
+	if err := client.AgentConfigurations.Update(t.Context(), id, &UpdateAgentConfigurationRequest{
+		Type: "telegraf", Name: name + "-upd", ConnectionMode: "no-tls",
+		PollerIDs: []int{1}, Configuration: conf,
+	}); err != nil {
+		t.Fatalf("AgentConfigurations.Update: %v", err)
+	}
+
+	ac2, err := client.AgentConfigurations.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("AgentConfigurations.Get after update: %v", err)
+	}
+	if ac2.Name != name+"-upd" {
+		t.Errorf("after update Name = %q, want %q", ac2.Name, name+"-upd")
+	}
+	if ac2.ConnectionMode != "no-tls" {
+		t.Errorf("after update ConnectionMode = %q, want no-tls", ac2.ConnectionMode)
+	}
+}
+
+func TestIntegration_AdditionalConnectorConfigurationLifecycle(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	name := fmt.Sprintf("go-it-acc-%d", time.Now().UnixNano())
+	createParams := json.RawMessage(`{"port":5700,"vcenters":[{"name":"vc1","url":"https://vc1/sdk","username":"user","password":"pass"}]}`)
+
+	id, err := client.AdditionalConnectorConfigurations.Create(t.Context(), &CreateAdditionalConnectorConfigurationRequest{
+		Type: "vmware_v6", Name: name, Description: "GO IT connector",
+		Pollers: []int{1}, Parameters: createParams,
+	})
+	if err != nil {
+		t.Fatalf("AdditionalConnectorConfigurations.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.AdditionalConnectorConfigurations.Delete(context.Background(), id); err != nil {
+			t.Logf("cleanup: delete additional connector configuration %d: %v", id, err)
+		}
+	})
+
+	acc, err := client.AdditionalConnectorConfigurations.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("AdditionalConnectorConfigurations.Get: %v", err)
+	}
+	if acc.ID != id || acc.Name != name {
+		t.Errorf("Get = {ID:%d Name:%q}, want {ID:%d Name:%q}", acc.ID, acc.Name, id, name)
+	}
+	if acc.Type != "vmware_v6" {
+		t.Errorf("Get Type = %q, want vmware_v6", acc.Type)
+	}
+	if len(acc.Parameters) == 0 {
+		t.Error("Get Parameters is empty, want the vmware_v6 parameters object")
+	}
+
+	// The read masks vcenter passwords and assigns each vcenter an id, which the
+	// update must echo back (else 25.10.x returns HTTP 500 for vcenters[].id).
+	var params struct {
+		Vcenters []struct {
+			ID int `json:"id"`
+		} `json:"vcenters"`
+	}
+	if err := json.Unmarshal(acc.Parameters, &params); err != nil {
+		t.Fatalf("decode parameters: %v", err)
+	}
+	if len(params.Vcenters) != 1 {
+		t.Fatalf("len(vcenters) = %d, want 1", len(params.Vcenters))
+	}
+	vcID := params.Vcenters[0].ID
+
+	updateParams := json.RawMessage(fmt.Sprintf(`{"port":5701,"vcenters":[{"id":%d,"name":"vc1","url":"https://vc1/sdk","username":"user","password":"pass"}]}`, vcID))
+	if err := client.AdditionalConnectorConfigurations.Update(t.Context(), id, &UpdateAdditionalConnectorConfigurationRequest{
+		Type: "vmware_v6", Name: name + "-upd", Description: "GO IT connector updated",
+		Pollers: []int{1}, Parameters: updateParams,
+	}); err != nil {
+		t.Fatalf("AdditionalConnectorConfigurations.Update: %v", err)
+	}
+
+	acc2, err := client.AdditionalConnectorConfigurations.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("AdditionalConnectorConfigurations.Get after update: %v", err)
+	}
+	if acc2.Name != name+"-upd" {
+		t.Errorf("after update Name = %q, want %q", acc2.Name, name+"-upd")
+	}
+	if acc2.Description != "GO IT connector updated" {
+		t.Errorf("after update Description = %q, want %q", acc2.Description, "GO IT connector updated")
+	}
+	var updatedParams struct {
+		Port int `json:"port"`
+	}
+	if err := json.Unmarshal(acc2.Parameters, &updatedParams); err != nil {
+		t.Fatalf("decode updated parameters: %v", err)
+	}
+	if updatedParams.Port != 5701 {
+		t.Errorf("after update port = %d, want 5701", updatedParams.Port)
+	}
 }
