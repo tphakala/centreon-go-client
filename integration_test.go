@@ -843,6 +843,55 @@ func TestIntegration_OperationsRejectsMalformedBody(t *testing.T) {
 	}
 }
 
+// TestIntegration_OperationsNilResourcesAccepted proves the fix for issue #80:
+// the resource-posting operations send an empty array (not null) for a nil
+// Resources so the request is accepted (Acknowledge/Downtime/Check/Submit via
+// nilToEmpty, Comment already via make()). Verified live (Centreon 25.10.16): a body with
+// "resources": null returns HTTP 500 ("[resources] NULL value found, but an array
+// is required"), while "resources": [] is accepted as a no-op (HTTP 204). Each
+// subtest sends a request with a nil Resources; with the normalization the wire
+// carries [] and the live box returns 204, so assertBodyFormatAccepted passes.
+// Without the fix the body carries null and returns 500, which
+// assertBodyFormatAccepted reports as a rejected body, so these subtests fail
+// pre-fix and pass post-fix. The paired unit tests in operations_test.go pin the
+// [] wire bytes deterministically; this test confirms the live server accepts it.
+func TestIntegration_OperationsNilResourcesAccepted(t *testing.T) {
+	client := newIntegrationClient(t)
+	uniq := fmt.Sprintf("go-it-nilres-%d", time.Now().UnixNano())
+
+	t.Run("acknowledge", func(t *testing.T) {
+		err := client.Operations.Acknowledge(t.Context(), &AcknowledgeRequest{Comment: uniq})
+		assertBodyFormatAccepted(t, "acknowledge_nil_resources", err)
+	})
+
+	t.Run("check", func(t *testing.T) {
+		err := client.Operations.Check(t.Context(), &CheckRequest{})
+		assertBodyFormatAccepted(t, "check_nil_resources", err)
+	})
+
+	t.Run("downtime", func(t *testing.T) {
+		now := time.Now()
+		err := client.Operations.Downtime(t.Context(), &DowntimeRequest{
+			Comment:   uniq,
+			StartTime: now,
+			EndTime:   now.Add(time.Hour),
+			Fixed:     true,
+			Duration:  3600,
+		})
+		assertBodyFormatAccepted(t, "downtime_nil_resources", err)
+	})
+
+	t.Run("submit", func(t *testing.T) {
+		err := client.Operations.Submit(t.Context(), &SubmitResultRequest{})
+		assertBodyFormatAccepted(t, "submit_nil_resources", err)
+	})
+
+	t.Run("comment", func(t *testing.T) {
+		err := client.Operations.Comment(t.Context(), &CommentRequest{Comment: uniq})
+		assertBodyFormatAccepted(t, "comment_nil_resources", err)
+	})
+}
+
 // --- Configuration CRUD lifecycle for #57 (commands) and #58 (service
 // categories / groups). Categories and groups have a delete route, so they
 // round-trip Create -> Get -> Update -> Get and clean up. Commands have no
