@@ -146,7 +146,7 @@ func TestTimePeriodService_Create_NilSlices(t *testing.T) {
 
 	mux.HandleFunc("POST /centreon/api/latest/configuration/timeperiods", func(w http.ResponseWriter, r *http.Request) {
 		body := decodeBody(t, r)
-		// API rejects null — both must be arrays even when caller omits them.
+		// API rejects null: both must be arrays even when the caller omits them.
 		if _, ok := body["days"].([]any); !ok {
 			t.Errorf("days must be an array, got %T (%v)", body["days"], body["days"])
 		}
@@ -182,6 +182,11 @@ func TestTimePeriodService_Update(t *testing.T) {
 		if _, ok := body["templates"].([]any); !ok {
 			t.Errorf("templates must be an array, got %T (%v)", body["templates"], body["templates"])
 		}
+		// On 25.10.x the API rejects a missing exceptions field on update; a nil
+		// Exceptions slice must be normalized to an empty array, not null.
+		if _, ok := body["exceptions"].([]any); !ok {
+			t.Errorf("exceptions must be an array, got %T (%v)", body["exceptions"], body["exceptions"])
+		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 
@@ -191,6 +196,53 @@ func TestTimePeriodService_Update(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Update: %v", err)
+	}
+}
+
+// TestTimePeriodService_UpdateDoesNotMutateRequest pins the guarantee that
+// Update normalizes nil slices on a copy, leaving the caller's request struct
+// untouched. Without the copy (the pre-fix form that mutated req directly) the
+// caller's nil slices would come back as empty slices.
+func TestTimePeriodService_UpdateDoesNotMutateRequest(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("PUT /centreon/api/latest/configuration/timeperiods/5", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := &UpdateTimePeriodRequest{Name: "x", Alias: "y"}
+	if err := c.TimePeriods.Update(t.Context(), 5, req); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if req.Days != nil {
+		t.Errorf("Update mutated caller's req.Days to %v, want nil", req.Days)
+	}
+	if req.Templates != nil {
+		t.Errorf("Update mutated caller's req.Templates to %v, want nil", req.Templates)
+	}
+	if req.Exceptions != nil {
+		t.Errorf("Update mutated caller's req.Exceptions to %v, want nil", req.Exceptions)
+	}
+}
+
+// TestTimePeriodService_CreateDoesNotMutateRequest is the Create-side sibling of
+// TestTimePeriodService_UpdateDoesNotMutateRequest.
+func TestTimePeriodService_CreateDoesNotMutateRequest(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/configuration/timeperiods", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusCreated, map[string]int{"id": 8})
+	})
+
+	req := &CreateTimePeriodRequest{Name: "x", Alias: "y"}
+	if _, err := c.TimePeriods.Create(t.Context(), req); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if req.Days != nil {
+		t.Errorf("Create mutated caller's req.Days to %v, want nil", req.Days)
+	}
+	if req.Templates != nil {
+		t.Errorf("Create mutated caller's req.Templates to %v, want nil", req.Templates)
 	}
 }
 

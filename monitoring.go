@@ -58,22 +58,82 @@ func (s *MonitoringResourceService) All(ctx context.Context, opts ...ListOption)
 	return all(ctx, s.List, opts)
 }
 
+// monitoringResourceDetail is the wire shape of the per-id detail endpoints
+// GET /monitoring/resources/hosts/{id} and .../services/{sid}. On Centreon
+// 25.10.x the detail body differs from the list payload: it sends "in_downtime"
+// and "acknowledged" (not "is_in_downtime"/"is_acknowledged"), and omits
+// "host_id", "service_id", and "is_notification_enabled" at the top level.
+// The caller fills HostID and ServiceID from the request arguments.
+type monitoringResourceDetail struct {
+	ID                   int                       `json:"id"`
+	Name                 string                    `json:"name"`
+	Type                 string                    `json:"type"`
+	Alias                string                    `json:"alias"`
+	FQDN                 string                    `json:"fqdn"`
+	MonitoringServerName string                    `json:"monitoring_server_name"`
+	Parent               *MonitoringResourceParent `json:"parent"`
+	Status               ResourceStatus            `json:"status"`
+	InDowntime           bool                      `json:"in_downtime"`
+	Acknowledged         bool                      `json:"acknowledged"`
+	Information          string                    `json:"information"`
+	Tries                string                    `json:"tries"`
+	LastStatusChange     string                    `json:"last_status_change"`
+}
+
+// toResource maps a decoded detail payload onto a MonitoringResource. HostID and
+// ServiceID are left zero here; the caller sets them from the request arguments
+// because the detail endpoint omits them at the top level.
+func (d *monitoringResourceDetail) toResource() *MonitoringResource {
+	return &MonitoringResource{
+		ID:                   d.ID,
+		Name:                 d.Name,
+		Type:                 d.Type,
+		Alias:                d.Alias,
+		FQDN:                 d.FQDN,
+		MonitoringServerName: d.MonitoringServerName,
+		Parent:               d.Parent,
+		Status:               d.Status,
+		IsInDowntime:         d.InDowntime,
+		IsAcknowledged:       d.Acknowledged,
+		Information:          d.Information,
+		Tries:                d.Tries,
+		LastStatusChange:     d.LastStatusChange,
+	}
+}
+
 // GetHost returns the monitoring resource for a specific host.
+//
+// On Centreon 25.10.x the per-id detail endpoint returns a different top-level
+// JSON shape than List: it sends "in_downtime" and "acknowledged" (mapped here
+// to IsInDowntime and IsAcknowledged) and omits "host_id" and
+// "is_notification_enabled". HostID is therefore populated from the hostID
+// argument, and NotificationEnabled is not reported by this endpoint and stays
+// false; use List when NotificationEnabled is needed.
 func (s *MonitoringResourceService) GetHost(ctx context.Context, hostID int) (*MonitoringResource, error) {
-	var result MonitoringResource
-	if err := s.client.get(ctx, fmt.Sprintf("/monitoring/resources/hosts/%d", hostID), &result); err != nil {
+	var detail monitoringResourceDetail
+	if err := s.client.get(ctx, fmt.Sprintf("/monitoring/resources/hosts/%d", hostID), &detail); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	res := detail.toResource()
+	res.HostID = hostID
+	return res, nil
 }
 
 // GetService returns the monitoring resource for a specific service on a host.
+//
+// See GetHost for the detail-endpoint caveats. HostID and ServiceID are
+// populated from the hostID and serviceID arguments because the detail body
+// omits them at the top level, and NotificationEnabled stays false because the
+// endpoint does not report it.
 func (s *MonitoringResourceService) GetService(ctx context.Context, hostID, serviceID int) (*MonitoringResource, error) {
-	var result MonitoringResource
-	if err := s.client.get(ctx, fmt.Sprintf("/monitoring/resources/hosts/%d/services/%d", hostID, serviceID), &result); err != nil {
+	var detail monitoringResourceDetail
+	if err := s.client.get(ctx, fmt.Sprintf("/monitoring/resources/hosts/%d/services/%d", hostID, serviceID), &detail); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	res := detail.toResource()
+	res.HostID = hostID
+	res.ServiceID = serviceID
+	return res, nil
 }
 
 // WithResourceTypes filters the /monitoring/resources listing by resource type.

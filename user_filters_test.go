@@ -1,7 +1,6 @@
 package centreon
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 )
@@ -9,13 +8,15 @@ import (
 func TestUserFilterService_List(t *testing.T) {
 	mux, c := newTestMux(t)
 
+	// Map-based body pins the wire keys independently of the struct: the server
+	// sends the plural "criterias" and an "order" field, and both must decode.
 	mux.HandleFunc("GET /centreon/api/latest/users/filters/events-view", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, ListResponse[UserFilter]{
-			Result: []UserFilter{
-				{ID: 1, Name: "my-filter"},
-				{ID: 2, Name: "another-filter"},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{"id": 1, "name": "my-filter", "order": 0, "criterias": []any{}},
+				{"id": 2, "name": "another-filter", "order": 1, "criterias": []any{}},
 			},
-			Meta: Meta{Page: 1, Limit: 10, Total: 2},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
 		})
 	})
 
@@ -29,17 +30,24 @@ func TestUserFilterService_List(t *testing.T) {
 	if resp.Result[0].Name != "my-filter" {
 		t.Errorf("Result[0].Name = %q, want %q", resp.Result[0].Name, "my-filter")
 	}
+	if resp.Result[1].Order != 1 {
+		t.Errorf("Result[1].Order = %d, want 1", resp.Result[1].Order)
+	}
 }
 
 func TestUserFilterService_Get(t *testing.T) {
 	mux, c := newTestMux(t)
 
+	// The live server sends the plural "criterias" key and an "order" field.
+	// Using a map body (not a UserFilter literal) pins those wire keys so a tag
+	// regression back to the singular "criteria" would fail the decode below.
 	mux.HandleFunc("GET /centreon/api/latest/users/filters/events-view/3", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, UserFilter{
-			ID:   3,
-			Name: "test-filter",
-			Criteria: []FilterCriteria{
-				{Name: "status", Type: "string", Value: "OK"},
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":    3,
+			"name":  "test-filter",
+			"order": 2,
+			"criterias": []map[string]any{
+				{"name": "status", "type": "multi_select", "value": "OK", "object_type": ""},
 			},
 		})
 	})
@@ -54,6 +62,9 @@ func TestUserFilterService_Get(t *testing.T) {
 	if uf.Name != "test-filter" {
 		t.Errorf("Name = %q, want %q", uf.Name, "test-filter")
 	}
+	if uf.Order != 2 {
+		t.Errorf("Order = %d, want 2", uf.Order)
+	}
 	if len(uf.Criteria) != 1 {
 		t.Fatalf("len(Criteria) = %d, want 1", len(uf.Criteria))
 	}
@@ -66,12 +77,18 @@ func TestUserFilterService_Create(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("POST /centreon/api/latest/users/filters/events-view", func(w http.ResponseWriter, r *http.Request) {
-		var req CreateUserFilterRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Fatalf("decode body: %v", err)
+		body := decodeBody(t, r)
+		if body["name"] != "new-filter" {
+			t.Errorf("name = %q, want %q", body["name"], "new-filter")
 		}
-		if req.Name != "new-filter" {
-			t.Errorf("Name = %q, want %q", req.Name, "new-filter")
+		// The server requires the plural "criterias" array (additionalProperties:
+		// false) and never the singular "criteria"; a nil slice is normalized to
+		// an empty array so the required field is always present.
+		if _, ok := body["criterias"].([]any); !ok {
+			t.Errorf("criterias must be an array, got %T (%v)", body["criterias"], body["criterias"])
+		}
+		if _, exists := body["criteria"]; exists {
+			t.Error(`legacy singular key "criteria" must not be sent`)
 		}
 		writeJSON(w, http.StatusCreated, map[string]int{"id": 7})
 	})
@@ -91,12 +108,15 @@ func TestUserFilterService_Update(t *testing.T) {
 	mux, c := newTestMux(t)
 
 	mux.HandleFunc("PUT /centreon/api/latest/users/filters/events-view/3", func(w http.ResponseWriter, r *http.Request) {
-		var req UpdateUserFilterRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Fatalf("decode body: %v", err)
+		body := decodeBody(t, r)
+		if body["name"] != "updated-filter" {
+			t.Errorf("name = %q, want %q", body["name"], "updated-filter")
 		}
-		if req.Name != "updated-filter" {
-			t.Errorf("Name = %q, want %q", req.Name, "updated-filter")
+		if _, ok := body["criterias"].([]any); !ok {
+			t.Errorf("criterias must be an array, got %T (%v)", body["criterias"], body["criterias"])
+		}
+		if _, exists := body["criteria"]; exists {
+			t.Error(`legacy singular key "criteria" must not be sent`)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -110,19 +130,23 @@ func TestUserFilterService_Update(t *testing.T) {
 func TestUserFilterService_Patch(t *testing.T) {
 	mux, c := newTestMux(t)
 
+	// PATCH on this route reorders: it requires "order" and rejects "name".
 	mux.HandleFunc("PATCH /centreon/api/latest/users/filters/events-view/3", func(w http.ResponseWriter, r *http.Request) {
-		var req PatchUserFilterRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Fatalf("decode body: %v", err)
+		body := decodeBody(t, r)
+		order, ok := body["order"].(float64)
+		if !ok {
+			t.Fatalf("order must be a JSON number, got %T (%v)", body["order"], body["order"])
 		}
-		if req.Name == nil || *req.Name != "patched-filter" {
-			t.Errorf("Name = %v, want %q", req.Name, "patched-filter")
+		if order != 2 {
+			t.Errorf("order = %v, want 2", order)
+		}
+		if _, exists := body["name"]; exists {
+			t.Error(`"name" must not be sent on the reorder PATCH route`)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	name := "patched-filter"
-	err := c.UserFilters.Patch(t.Context(), 3, PatchUserFilterRequest{Name: &name})
+	err := c.UserFilters.Patch(t.Context(), 3, PatchUserFilterRequest{Order: 2})
 	if err != nil {
 		t.Fatalf("Patch: %v", err)
 	}

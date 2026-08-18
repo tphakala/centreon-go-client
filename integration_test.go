@@ -1004,3 +1004,95 @@ func TestIntegration_CommandCreate(t *testing.T) {
 		t.Errorf("created command %q (type %d) not found on readback", name, commandType)
 	}
 }
+
+// TestIntegration_UserFilterLifecycle exercises the events-view user filter CRUD
+// round-trip that mock unit tests could not reach: Create and Update must send
+// the plural "criterias" array (25.10.x rejects the singular key with HTTP 500),
+// Get must decode "criterias" and "order", and Patch reorders (it sends "order",
+// not "name"). This is the first live round-trip for this service (#71).
+func TestIntegration_UserFilterLifecycle(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	name := fmt.Sprintf("go-it-filter-%d", time.Now().UnixNano())
+	id, err := client.UserFilters.Create(t.Context(), CreateUserFilterRequest{Name: name})
+	if err != nil {
+		t.Fatalf("UserFilters.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.UserFilters.Delete(context.Background(), id); err != nil {
+			t.Logf("cleanup: delete user filter %d: %v", id, err)
+		}
+	})
+
+	uf, err := client.UserFilters.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("UserFilters.Get: %v", err)
+	}
+	if uf.ID != id {
+		t.Errorf("Get ID = %d, want %d", uf.ID, id)
+	}
+	if uf.Name != name {
+		t.Errorf("Get Name = %q, want %q", uf.Name, name)
+	}
+
+	newName := name + "-upd"
+	if err := client.UserFilters.Update(t.Context(), id, UpdateUserFilterRequest{Name: newName}); err != nil {
+		t.Fatalf("UserFilters.Update (PUT): %v", err)
+	}
+	uf2, err := client.UserFilters.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("UserFilters.Get (after update): %v", err)
+	}
+	if uf2.Name != newName {
+		t.Errorf("Name after update = %q, want %q", uf2.Name, newName)
+	}
+
+	// Patch is a reorder-only route: sending the filter's current order is a safe
+	// no-op that still proves the "order" body is accepted and "name" is not
+	// required.
+	if err := client.UserFilters.Patch(t.Context(), id, PatchUserFilterRequest{Order: uf2.Order}); err != nil {
+		t.Fatalf("UserFilters.Patch (reorder to current order %d): %v", uf2.Order, err)
+	}
+}
+
+// TestIntegration_TimePeriodUpdateExceptions proves the #72 fix live: PUT
+// /configuration/timeperiods/{id} requires the exceptions field on 25.10.x, so
+// Update must always send it (a nil Exceptions slice is normalized to []). A
+// pre-fix Update omitted exceptions and got HTTP 400 "[exceptions] required".
+func TestIntegration_TimePeriodUpdateExceptions(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	name := fmt.Sprintf("go-it-tp-%d", time.Now().UnixNano())
+	id, err := client.TimePeriods.Create(t.Context(), &CreateTimePeriodRequest{
+		Name:  name,
+		Alias: "GO IT time period",
+		Days:  []TimePeriodDay{{Day: 1, TimeRange: "08:00-17:00"}},
+	})
+	if err != nil {
+		t.Fatalf("TimePeriods.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.TimePeriods.Delete(context.Background(), id); err != nil {
+			t.Logf("cleanup: delete time period %d: %v", id, err)
+		}
+	})
+
+	const newAlias = "GO IT time period updated"
+	// No Exceptions set: the client must still send "exceptions":[] or the server
+	// rejects the update with HTTP 400 "[exceptions] required".
+	if err := client.TimePeriods.Update(t.Context(), id, &UpdateTimePeriodRequest{
+		Name:  name,
+		Alias: newAlias,
+		Days:  []TimePeriodDay{{Day: 1, TimeRange: "09:00-18:00"}},
+	}); err != nil {
+		t.Fatalf("TimePeriods.Update: want success (no HTTP 400 for missing exceptions), got %v", err)
+	}
+
+	tp, err := client.TimePeriods.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("TimePeriods.Get (after update): %v", err)
+	}
+	if tp.Alias != newAlias {
+		t.Errorf("Alias after update = %q, want %q", tp.Alias, newAlias)
+	}
+}

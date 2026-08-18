@@ -176,22 +176,24 @@ func TestMonitoringResourceService_List(t *testing.T) {
 func TestMonitoringResourceService_GetHost(t *testing.T) {
 	mux, c := newTestMux(t)
 
+	// The per-id detail endpoint uses a different top-level shape than List: it
+	// sends "in_downtime"/"acknowledged" (no is_ prefix) and omits "host_id" and
+	// "is_notification_enabled". Both flags are set true so a decode against the
+	// list-shaped keys (the original bug) would fail this test.
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/resources/hosts/42", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"id":                      42,
-			"name":                    "host-42",
-			"type":                    "host",
-			"fqdn":                    "host-42.example.com",
-			"host_id":                 42,
-			"monitoring_server_name":  "Central",
-			"parent":                  nil,
-			"status":                  map[string]any{"code": 0, "name": "UP", "severity_code": 5},
-			"is_in_downtime":          false,
-			"is_acknowledged":         false,
-			"information":             "OK - host-42 rta 0.2ms lost 0%",
-			"tries":                   "1/2 (H)",
-			"last_status_change":      "2026-04-01T12:00:00+03:00",
-			"is_notification_enabled": true,
+			"id":                     42,
+			"name":                   "host-42",
+			"type":                   "host",
+			"fqdn":                   "host-42.example.com",
+			"monitoring_server_name": "Central",
+			"parent":                 nil,
+			"status":                 map[string]any{"code": 0, "name": "UP", "severity_code": 5},
+			"in_downtime":            true,
+			"acknowledged":           true,
+			"information":            "OK - host-42 rta 0.2ms lost 0%",
+			"tries":                  "1/2 (H)",
+			"last_status_change":     "2026-04-01T12:00:00+03:00",
 		})
 	})
 
@@ -205,23 +207,26 @@ func TestMonitoringResourceService_GetHost(t *testing.T) {
 		FQDN: "host-42.example.com", HostID: 42,
 		MonitoringServerName: "Central",
 		Status:               ResourceStatus{Code: 0, Name: "UP", SeverityCode: 5},
+		IsInDowntime:         true,
+		IsAcknowledged:       true,
 		Information:          "OK - host-42 rta 0.2ms lost 0%",
 		Tries:                "1/2 (H)",
 		LastStatusChange:     "2026-04-01T12:00:00+03:00",
-		NotificationEnabled:  true,
+		// NotificationEnabled stays false: the detail endpoint omits it.
 	})
 }
 
 func TestMonitoringResourceService_GetService(t *testing.T) {
 	mux, c := newTestMux(t)
 
+	// Detail shape: "acknowledged" true, and no host_id/service_id or
+	// is_notification_enabled. HostID and ServiceID must be filled from the call
+	// arguments (10 and 5), not from the wire.
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/resources/hosts/10/services/5", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id":                     5,
 			"name":                   "Ping",
 			"type":                   "service",
-			"host_id":                10,
-			"service_id":             5,
 			"monitoring_server_name": "Central",
 			"parent": map[string]any{
 				"id":     10,
@@ -229,13 +234,12 @@ func TestMonitoringResourceService_GetService(t *testing.T) {
 				"type":   "host",
 				"status": map[string]any{"code": 0, "name": "UP", "severity_code": 5},
 			},
-			"status":                  map[string]any{"code": 0, "name": "OK", "severity_code": 5},
-			"is_in_downtime":          false,
-			"is_acknowledged":         false,
-			"information":             "OK - rta 0.5ms lost 0%",
-			"tries":                   "1/3 (H)",
-			"last_status_change":      "2026-04-01T08:00:00+03:00",
-			"is_notification_enabled": true,
+			"status":             map[string]any{"code": 0, "name": "OK", "severity_code": 5},
+			"in_downtime":        false,
+			"acknowledged":       true,
+			"information":        "OK - rta 0.5ms lost 0%",
+			"tries":              "1/3 (H)",
+			"last_status_change": "2026-04-01T08:00:00+03:00",
 		})
 	})
 
@@ -251,11 +255,12 @@ func TestMonitoringResourceService_GetService(t *testing.T) {
 			ID: 10, Name: "web01", Type: "host",
 			Status: ResourceStatus{Code: 0, Name: "UP", SeverityCode: 5},
 		},
-		Status:              ResourceStatus{Code: 0, Name: "OK", SeverityCode: 5},
-		Information:         "OK - rta 0.5ms lost 0%",
-		Tries:               "1/3 (H)",
-		LastStatusChange:    "2026-04-01T08:00:00+03:00",
-		NotificationEnabled: true,
+		Status:           ResourceStatus{Code: 0, Name: "OK", SeverityCode: 5},
+		IsAcknowledged:   true,
+		Information:      "OK - rta 0.5ms lost 0%",
+		Tries:            "1/3 (H)",
+		LastStatusChange: "2026-04-01T08:00:00+03:00",
+		// NotificationEnabled stays false: the detail endpoint omits it.
 	})
 }
 

@@ -54,6 +54,11 @@ linters:
   disable:
     - unused
   settings:
+    misspell:
+      # "criterias" is the Centreon 25.10 wire key for user-filter criteria
+      # (the server rejects the singular "criteria"), not a misspelling.
+      ignore-rules:
+        - criterias
     dupl:
       threshold: 120
     gocognit:
