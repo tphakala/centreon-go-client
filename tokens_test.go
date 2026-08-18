@@ -211,7 +211,7 @@ func TestTokenService_DeleteEscapesName(t *testing.T) {
 	// on net/http to encode a lone space.
 	const wantPath = "/centreon/api/latest/administration/tokens/a%20b%2Fc"
 	var gotPath string
-	c, _ := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	c := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.EscapedPath()
 		w.WriteHeader(http.StatusNoContent)
 	}))

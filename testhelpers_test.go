@@ -12,10 +12,10 @@ import (
 	"testing"
 )
 
-// newTestClient creates an httptest.Server wired to handler, and a Client
-// pre-configured with WithAPIToken("test-token"). The server is closed when
-// the test finishes.
-func newTestClient(t *testing.T, handler http.Handler) (*Client, *httptest.Server) {
+// newTestClient creates an httptest.Server wired to handler and returns a Client
+// pre-configured with WithAPIToken("test-token"). The server is closed when the
+// test finishes.
+func newTestClient(t *testing.T, handler http.Handler) *Client {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
@@ -23,14 +23,14 @@ func newTestClient(t *testing.T, handler http.Handler) (*Client, *httptest.Serve
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	return c, srv
+	return c
 }
 
 // newTestMux creates a ServeMux and a Client wired to it.
 func newTestMux(t *testing.T) (*http.ServeMux, *Client) {
 	t.Helper()
 	mux := http.NewServeMux()
-	c, _ := newTestClient(t, mux)
+	c := newTestClient(t, mux)
 	return mux, c
 }
 
