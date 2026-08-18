@@ -3,6 +3,7 @@ package centreon
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -482,5 +483,100 @@ func TestDowntimeService_CancelForHost_NoneActive(t *testing.T) {
 
 	if err := c.Downtimes.CancelForHost(t.Context(), 10); err != nil {
 		t.Fatalf("CancelForHost: %v", err)
+	}
+}
+
+// assertWholeSecondRFC3339 fails unless raw is a JSON string holding an RFC3339
+// timestamp with no fractional-second component. That is the only form the
+// per-host and per-service downtime create endpoints accept; a fractional second
+// is rejected with HTTP 500 ("Invalid datetime ..., expected the format
+// Y-m-d\TH:i:sP") on Centreon 25.10.16. The no-dot check is load-bearing:
+// time.Parse tolerates a trailing fraction even when the layout omits it, so a
+// parse alone would not catch the bug.
+func assertWholeSecondRFC3339(t *testing.T, field string, raw json.RawMessage) {
+	t.Helper()
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		t.Fatalf("%s: not a JSON string: %v (raw=%s)", field, err, raw)
+	}
+	if strings.Contains(s, ".") {
+		t.Errorf("%s = %q, want no fractional seconds (endpoint rejects fractional with HTTP 500)", field, s)
+	}
+	if _, err := time.Parse(time.RFC3339, s); err != nil {
+		t.Errorf("%s = %q, not valid RFC3339: %v", field, s, err)
+	}
+}
+
+func TestDowntimeService_CreateForHost_TruncatesFractionalSeconds(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	// Non-zero nanoseconds in a non-UTC zone mirror the live failure
+	// (2026-08-18T14:58:33.736823+03:00). Without the fix, start_time/end_time
+	// marshal with a ".NNN" fraction and the endpoint returns HTTP 500.
+	loc := time.FixedZone("EEST", 3*60*60)
+	start := time.Date(2026, 8, 18, 14, 58, 33, 736823000, loc)
+	end := start.Add(time.Hour)
+	var called bool
+
+	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/downtimes", func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		assertWholeSecondRFC3339(t, "start_time", raw["start_time"])
+		assertWholeSecondRFC3339(t, "end_time", raw["end_time"])
+		// The whole second must survive truncation (not be over-truncated).
+		if got, want := string(raw["start_time"]), `"2026-08-18T14:58:33+03:00"`; got != want {
+			t.Errorf("start_time = %s, want %s", got, want)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := &CreateHostDowntimeRequest{Comment: "frac", StartTime: start, EndTime: end, IsFixed: true}
+	if err := c.Downtimes.CreateForHost(t.Context(), 10, req); err != nil {
+		t.Fatalf("CreateForHost: %v", err)
+	}
+	if !called {
+		t.Error("handler was not called")
+	}
+	// Truncation must be on a copy: the caller's request keeps its precision.
+	if req.StartTime.Nanosecond() == 0 {
+		t.Error("CreateForHost mutated caller's req.StartTime; truncation must be on a copy")
+	}
+}
+
+func TestDowntimeService_CreateForService_TruncatesFractionalSeconds(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	loc := time.FixedZone("EEST", 3*60*60)
+	start := time.Date(2026, 8, 18, 14, 58, 33, 736823000, loc)
+	end := start.Add(time.Hour)
+	var called bool
+
+	mux.HandleFunc("POST /centreon/api/latest/monitoring/hosts/10/services/5/downtimes", func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		assertWholeSecondRFC3339(t, "start_time", raw["start_time"])
+		assertWholeSecondRFC3339(t, "end_time", raw["end_time"])
+		// The whole second must survive truncation (not be over-truncated).
+		if got, want := string(raw["start_time"]), `"2026-08-18T14:58:33+03:00"`; got != want {
+			t.Errorf("start_time = %s, want %s", got, want)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := &CreateServiceDowntimeRequest{Comment: "frac", StartTime: start, EndTime: end, Duration: 3600}
+	if err := c.Downtimes.CreateForService(t.Context(), 10, 5, req); err != nil {
+		t.Fatalf("CreateForService: %v", err)
+	}
+	if !called {
+		t.Error("handler was not called")
+	}
+	if req.StartTime.Nanosecond() == 0 {
+		t.Error("CreateForService mutated caller's req.StartTime; truncation must be on a copy")
 	}
 }

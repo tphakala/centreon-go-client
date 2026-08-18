@@ -321,3 +321,39 @@ func TestToken_RedactsSecret(t *testing.T) {
 		t.Errorf("String() for empty Value = %q, want it to contain <empty>", s)
 	}
 }
+
+func TestTokenService_CreateTruncatesExpirationDate(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	var called bool
+	mux.HandleFunc("POST /centreon/api/latest/administration/tokens", func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		// The endpoint rejects a fractional-second expiration_date with HTTP 422,
+		// so the client truncates to whole seconds before sending.
+		assertWholeSecondRFC3339(t, "expiration_date", raw["expiration_date"])
+		if got, want := string(raw["expiration_date"]), `"2027-01-01T12:00:00+03:00"`; got != want {
+			t.Errorf("expiration_date = %s, want %s", got, want)
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"name": "tok", "type": "api", "token": "secret",
+			"expiration_date": "2027-01-01T12:00:00+03:00",
+		})
+	})
+
+	exp := time.Date(2027, 1, 1, 12, 0, 0, 736823000, time.FixedZone("EEST", 3*60*60))
+	req := &CreateTokenRequest{Name: "tok", Type: "api", UserID: 1, ExpirationDate: &exp}
+	if _, err := c.Tokens.Create(t.Context(), req); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if !called {
+		t.Error("handler was not called")
+	}
+	// Truncation must be on a copy: the caller's ExpirationDate is untouched.
+	if req.ExpirationDate.Nanosecond() == 0 {
+		t.Error("Create mutated caller's req.ExpirationDate; truncation must be on a copy")
+	}
+}

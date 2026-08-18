@@ -3,6 +3,7 @@ package centreon
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -87,8 +88,11 @@ func TestOperationsService_Acknowledge(t *testing.T) {
 func TestOperationsService_Downtime(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	start := time.Date(2024, 1, 15, 8, 0, 0, 0, time.UTC)
-	end := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	// Sub-second precision so the whole-second normalization is observable on the
+	// wire (this endpoint tolerates fractional, but the client normalizes anyway
+	// to stay consistent with the stricter per-host/service downtime endpoints).
+	start := time.Date(2024, 1, 15, 8, 0, 0, 500000000, time.UTC)
+	end := time.Date(2024, 1, 15, 10, 0, 0, 500000000, time.UTC)
 
 	var called bool
 	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/downtime", func(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +112,20 @@ func TestOperationsService_Downtime(t *testing.T) {
 		}
 		if dt["is_fixed"] != true {
 			t.Error("downtime.is_fixed should be true")
+		}
+		wantTimes := map[string]string{
+			"start_time": "2024-01-15T08:00:00Z",
+			"end_time":   "2024-01-15T10:00:00Z",
+		}
+		for k, want := range wantTimes {
+			s, ok := dt[k].(string)
+			if !ok {
+				t.Errorf("downtime.%s = %v, want a whole-second timestamp string", k, dt[k])
+				continue
+			}
+			if s != want {
+				t.Errorf("downtime.%s = %q, want %q (truncated to whole seconds)", k, s, want)
+			}
 		}
 
 		w.WriteHeader(http.StatusNoContent)
@@ -246,8 +264,13 @@ func TestOperationsService_Comment(t *testing.T) {
 			t.Errorf("comment = %v, want %q", res["comment"], "Under investigation")
 		}
 		requireNullParent(t, res, "resources[0]")
-		if _, hasDate := res["date"]; !hasDate {
+		s, hasDate := res["date"].(string)
+		if !hasDate {
 			t.Error("date is missing, want timestamp")
+		}
+		// Comment stamps time.Now(), truncated to whole seconds.
+		if strings.Contains(s, ".") {
+			t.Errorf("date = %q, want whole seconds (no fractional)", s)
 		}
 
 		w.WriteHeader(http.StatusNoContent)

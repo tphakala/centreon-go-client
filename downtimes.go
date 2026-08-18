@@ -93,13 +93,34 @@ func (s *DowntimeService) ListForService(ctx context.Context, hostID, serviceID 
 }
 
 // CreateForHost schedules a downtime for the given host.
+//
+// StartTime and EndTime are truncated to whole seconds before the request is
+// sent. This endpoint requires whole-second RFC3339 timestamps (the Go layout
+// "2006-01-02T15:04:05-07:00") and rejects a fractional second, which
+// time.Time.MarshalJSON emits whenever the value carries sub-second precision
+// (as a time.Now() value does), with HTTP 500
+// (`Invalid datetime "...", expected one of the format "Y-m-d\TH:i:sP".`,
+// verified against Centreon 25.10.16). Truncation is applied to a copy, so the
+// caller's request is left unmodified.
 func (s *DowntimeService) CreateForHost(ctx context.Context, hostID int, req *CreateHostDowntimeRequest) error {
-	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/downtimes", hostID), req, nil)
+	body := *req
+	body.StartTime = body.StartTime.Truncate(time.Second)
+	body.EndTime = body.EndTime.Truncate(time.Second)
+	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/downtimes", hostID), &body, nil)
 }
 
 // CreateForService schedules a downtime for the given service on a host.
+//
+// StartTime and EndTime are truncated to whole seconds before the request is
+// sent, for the same reason as CreateForHost: this endpoint rejects a
+// fractional-second timestamp with HTTP 500 (verified against Centreon
+// 25.10.16). Truncation is applied to a copy, so the caller's request is left
+// unmodified.
 func (s *DowntimeService) CreateForService(ctx context.Context, hostID, serviceID int, req *CreateServiceDowntimeRequest) error {
-	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/downtimes", hostID, serviceID), req, nil)
+	body := *req
+	body.StartTime = body.StartTime.Truncate(time.Second)
+	body.EndTime = body.EndTime.Truncate(time.Second)
+	return s.client.post(ctx, fmt.Sprintf("/monitoring/hosts/%d/services/%d/downtimes", hostID, serviceID), &body, nil)
 }
 
 // CancelForHost cancels all active downtimes for the given host.
