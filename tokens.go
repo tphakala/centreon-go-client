@@ -82,7 +82,9 @@ func redactedSecret(v string) string {
 // live 25.10.16 instance). Type is the token kind ("api" or "cma"). UserID is
 // the id of the user the token authenticates as. ExpirationDate is optional:
 // when nil it is omitted from the body and the server creates a token with no
-// expiry.
+// expiry. When set, it is truncated to whole seconds before sending, because the
+// endpoint rejects a fractional-second expiration_date with HTTP 422 (verified
+// against Centreon 25.10.16).
 type CreateTokenRequest struct {
 	Name           string     `json:"name"`
 	Type           string     `json:"type"`
@@ -119,8 +121,13 @@ func (s *TokenService) All(ctx context.Context, opts ...ListOption) iter.Seq2[*T
 // the endpoint useless. The caller owns the secret from here: store it securely
 // and never log it.
 func (s *TokenService) Create(ctx context.Context, req *CreateTokenRequest) (*Token, error) {
+	body := *req
+	if body.ExpirationDate != nil {
+		t := body.ExpirationDate.Truncate(time.Second)
+		body.ExpirationDate = &t
+	}
 	var result Token
-	if err := s.client.post(ctx, "/administration/tokens", req, &result); err != nil {
+	if err := s.client.post(ctx, "/administration/tokens", &body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

@@ -285,3 +285,119 @@ func TestIntegration_OperationsSubmitE2E(t *testing.T) {
 			"(active-check overwrite race; best-effort, not a failure)", opsE2ESubmitTimeout)
 	}
 }
+
+// findMonitoringService returns the host id and service id of the first live
+// service resource, or skips when the realtime listing exposes none.
+func findMonitoringService(t *testing.T, client *Client) (hostID, serviceID int) {
+	t.Helper()
+	resp, err := client.Monitoring.List(t.Context(), WithResourceTypes("service"), WithLimit(100))
+	if err != nil {
+		t.Fatalf("Monitoring.List(service): %v", err)
+	}
+	for i := range resp.Result {
+		r := &resp.Result[i]
+		h := r.HostID
+		if h == 0 && r.Parent != nil {
+			h = r.Parent.ID
+		}
+		s := r.ServiceID
+		if s == 0 {
+			s = r.ID
+		}
+		if h != 0 && s != 0 {
+			return h, s
+		}
+	}
+	t.Skip("no live service resource found; monitoring engine may be absent")
+	return 0, 0
+}
+
+// TestIntegration_DowntimeCreateForHostE2E exercises DowntimeService.CreateForHost
+// (POST /monitoring/hosts/{id}/downtimes) with a natural time.Now() input, the
+// path the tolerant Operations.Downtime e2e test never covers. Pre-fix this fails
+// with HTTP 500 because time.Time.MarshalJSON emits a fractional second, which the
+// endpoint rejects; post-fix the client truncates to whole seconds and it returns
+// 204. See issue #82.
+func TestIntegration_DowntimeCreateForHostE2E(t *testing.T) {
+	client := newIntegrationClient(t)
+	host := findMonitoringHost(t, client, nil)
+	t.Logf("using live host resource id=%d name=%q", host.ID, host.Name)
+	ctx := t.Context()
+	comment := fmt.Sprintf("go-it-e2e-host-downtime-%d", time.Now().UnixNano())
+
+	t.Cleanup(func() {
+		if err := client.Downtimes.CancelForHost(context.Background(), host.ID); err != nil {
+			t.Logf("cleanup: cancel downtimes for host %d: %v", host.ID, err)
+		}
+	})
+
+	now := time.Now() // sub-second precision: the pre-fix reproducer
+	err := client.Downtimes.CreateForHost(ctx, host.ID, &CreateHostDowntimeRequest{
+		Comment:   comment,
+		StartTime: now,
+		EndTime:   now.Add(time.Hour),
+		IsFixed:   true,
+		Duration:  3600,
+	})
+	if err != nil {
+		t.Fatalf("CreateForHost on live host %d: want HTTP 204 (nil error), got %v", host.ID, err)
+	}
+
+	requireVisible(t, fmt.Sprintf("host downtime (comment %q) in Downtimes.ListForHost(%d)", comment, host.ID),
+		func() (bool, error) {
+			resp, err := client.Downtimes.ListForHost(ctx, host.ID, WithLimit(100), newestFirst())
+			if err != nil {
+				return false, err
+			}
+			for i := range resp.Result {
+				if !resp.Result[i].IsCancelled && strings.Contains(resp.Result[i].Comment, comment) {
+					return true, nil
+				}
+			}
+			return false, nil
+		})
+}
+
+// TestIntegration_DowntimeCreateForServiceE2E is the per-service analogue of
+// TestIntegration_DowntimeCreateForHostE2E
+// (POST /monitoring/hosts/{id}/services/{sid}/downtimes). Same pre-fix HTTP 500 /
+// post-fix HTTP 204 behavior. See issue #82.
+func TestIntegration_DowntimeCreateForServiceE2E(t *testing.T) {
+	client := newIntegrationClient(t)
+	hostID, serviceID := findMonitoringService(t, client)
+	t.Logf("using live service resource host_id=%d service_id=%d", hostID, serviceID)
+	ctx := t.Context()
+	comment := fmt.Sprintf("go-it-e2e-svc-downtime-%d", time.Now().UnixNano())
+
+	t.Cleanup(func() {
+		if err := client.Downtimes.CancelForService(context.Background(), hostID, serviceID); err != nil {
+			t.Logf("cleanup: cancel downtimes for host %d service %d: %v", hostID, serviceID, err)
+		}
+	})
+
+	now := time.Now()
+	err := client.Downtimes.CreateForService(ctx, hostID, serviceID, &CreateServiceDowntimeRequest{
+		Comment:   comment,
+		StartTime: now,
+		EndTime:   now.Add(time.Hour),
+		IsFixed:   true,
+		Duration:  3600,
+	})
+	if err != nil {
+		t.Fatalf("CreateForService on live host %d service %d: want HTTP 204 (nil error), got %v", hostID, serviceID, err)
+	}
+
+	requireVisible(t, fmt.Sprintf("service downtime (comment %q) in Downtimes.ListForService(%d,%d)", comment, hostID, serviceID),
+		func() (bool, error) {
+			resp, err := client.Downtimes.ListForService(ctx, hostID, serviceID, WithLimit(100), newestFirst())
+			if err != nil {
+				return false, err
+			}
+			for i := range resp.Result {
+				if !resp.Result[i].IsCancelled && strings.Contains(resp.Result[i].Comment, comment) {
+					return true, nil
+				}
+			}
+			return false, nil
+		})
+}

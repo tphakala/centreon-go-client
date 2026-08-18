@@ -133,14 +133,18 @@ func (s *OperationsService) Acknowledge(ctx context.Context, req *AcknowledgeReq
 
 // Downtime schedules downtime for one or more resources. A nil Resources is
 // normalized to an empty array (the endpoint rejects a null resources with HTTP
-// 500; see Acknowledge).
+// 500; see Acknowledge). StartTime and EndTime are truncated to whole seconds:
+// this endpoint accepts a fractional second, but the per-host and per-service
+// downtime endpoints (DowntimeService.CreateForHost/CreateForService) reject
+// them with HTTP 500, so normalizing here keeps all downtime-scheduling paths
+// consistent. The wire body is a fresh struct, so req is not mutated.
 func (s *OperationsService) Downtime(ctx context.Context, req *DowntimeRequest) error {
 	body := downtimeBody{
 		Resources: nilToEmpty(req.Resources),
 		Downtime: downtimeParam{
 			Comment:   req.Comment,
-			StartTime: req.StartTime,
-			EndTime:   req.EndTime,
+			StartTime: req.StartTime.Truncate(time.Second),
+			EndTime:   req.EndTime.Truncate(time.Second),
 			IsFixed:   req.Fixed,
 			Duration:  req.Duration,
 		},
@@ -171,7 +175,11 @@ func (s *OperationsService) Submit(ctx context.Context, req *SubmitResultRequest
 
 // Comment adds a comment to one or more resources.
 func (s *OperationsService) Comment(ctx context.Context, req *CommentRequest) error {
-	now := time.Now()
+	// Truncate to whole seconds, matching the downtime-scheduling paths. This
+	// endpoint accepts a fractional second, but the per-host and per-service
+	// downtime endpoints do not; normalizing the comment date keeps them
+	// consistent.
+	now := time.Now().Truncate(time.Second)
 	resources := make([]commentResource, len(req.Resources))
 	for i, r := range req.Resources {
 		resources[i] = commentResource{
