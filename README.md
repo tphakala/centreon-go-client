@@ -83,6 +83,7 @@ func main() {
 | Access Groups**** | yes | - | - | - | - |
 | Connectors**** | yes | - | - | - | - |
 | Icons**** | yes | - | - | - | - |
+| Tokens (administration)****** | yes | - | yes | - | yes |
 
 *\* by ID = filtered list lookup (API has no direct GET endpoint)*
 
@@ -93,6 +94,8 @@ func main() {
 *\*\*\*\* Read-only lookups exposed by Centreon Web 25.10: `List` and `All` only, with no per-id, create, update, or delete route (POST returns HTTP 405). The Icons list is empty on a stock install because the media library is unpopulated.*
 
 *\*\*\*\*\* `Get(ctx, id)` returns the full configuration including a type-dependent nested object, exposed as a `json.RawMessage` for the caller to decode per `type`: `configuration` for agent configurations (`telegraf` vs `centreon-agent`) and `parameters` for additional connector configurations (`vmware_v6`). The list representation omits that object (and, for agent configurations, `connection_mode`; for connector configurations, `pollers`). `Create` and `Update` (PUT) take the nested object as a `json.RawMessage` too; on update, the `vmware_v6` `parameters.vcenters[]` entries must carry their server-assigned `id`. Requires Centreon 25.10+.*
+
+*\*\*\*\*\*\* API tokens live under `/administration/tokens`, not `/configuration`. `Create` returns the full `*Token` including the one-time secret (`Value`), which the API returns only on create: store it securely and never log it (`Token` redacts `Value` from its `String`/`slog` output). There is no usable per-id lookup (the `GET /administration/tokens/{name}` route is registered but always returns 404 regardless of the identifier) and no `Update` route; `Delete` takes the token name because tokens have no numeric id.*
 
 ### User & Contact Management
 
@@ -123,6 +126,8 @@ func main() {
 *† `GetHost` populates `HostID`, and `GetService` populates `HostID` and `ServiceID`, from the call arguments, because the Centreon 25.10.x per-id detail endpoint omits them at the top level; that endpoint also does not report `is_notification_enabled`, so `NotificationEnabled` is populated only by `List` (and `All`).*
 
 *‡ `Metrics` returns an empty result rather than an error when a service has no performance data: Centreon 25.10.x answers that case with HTTP 404 `metrics not found`, which the client maps to an empty slice. Any other 404 (for example a nonexistent host or service) is surfaced as an `*APIError`.*
+
+*The `MonitoringHost`, `MonitoringService`, and unified `MonitoringResource` structs decode additional real-time fields across these structs, with the exact set differing per endpoint (for example `duration` on services and resources, `last_update` and the per-check timers on hosts, `criticality` on hosts and services, and flapping and check-toggle flags on resources). `check_attempt` is asymmetric across endpoints: it is a JSON number on `/monitoring/hosts` (typed `int` on `MonitoringHost`) and a JSON string on `/monitoring/services` (typed `string` on `MonitoringService`). On unified resources, `severity` and `icon` are exposed as `*json.RawMessage` (nil for a null or absent value) because they are null on Centreon 25.10.16 and their populated shape is not yet verified against a live instance; `GetHost` and `GetService` do not populate these enrichment fields (they were verified only on the list endpoint).*
 
 ### Downtime Management
 

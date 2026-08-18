@@ -74,6 +74,9 @@ type Client struct {
 	Connectors   *ConnectorService
 	Icons        *IconService
 	AccessGroups *AccessGroupService
+
+	// Administration.
+	Tokens *TokenService
 }
 
 // Option configures a Client.
@@ -131,6 +134,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.Connectors = &ConnectorService{client: c}
 	c.Icons = &IconService{client: c}
 	c.AccessGroups = &AccessGroupService{client: c}
+	c.Tokens = &TokenService{client: c}
 	return c, nil
 }
 

@@ -84,6 +84,24 @@ func wantNilIntPtr(t *testing.T, name string, got *int) {
 	}
 }
 
+func wantStrPtr(t *testing.T, name string, got *string, want string) {
+	t.Helper()
+	if got == nil {
+		t.Errorf("%s = nil, want %q", name, want)
+		return
+	}
+	if *got != want {
+		t.Errorf("%s = %q, want %q", name, *got, want)
+	}
+}
+
+func wantNilStrPtr(t *testing.T, name string, got *string) {
+	t.Helper()
+	if got != nil {
+		t.Errorf("%s = %q, want nil", name, *got)
+	}
+}
+
 func wantStrSlice(t *testing.T, name string, got, want []string) {
 	t.Helper()
 	if !slices.Equal(got, want) {

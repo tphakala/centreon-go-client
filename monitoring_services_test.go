@@ -472,3 +472,93 @@ func TestMonitoringServiceService_Metrics_NotFoundMessageSuperstring(t *testing.
 		t.Errorf("HTTPStatus = %d, want 404", apiErr.HTTPStatus)
 	}
 }
+
+// TestMonitoringService_Decode_CheckAttemptString pins the check_attempt
+// asymmetry: on /monitoring/services the field is a quoted JSON string ("1"), so
+// MonitoringService.CheckAttempt is typed string. Retyping it to int makes this
+// Unmarshal fail and breaks decoding of the entire service List response.
+func TestMonitoringService_Decode_CheckAttemptString(t *testing.T) {
+	raw := `{"id":1,"description":"Ping","check_attempt":"1","host":{"id":1,"name":"h"}}`
+	var svc MonitoringService
+	if err := json.Unmarshal([]byte(raw), &svc); err != nil {
+		t.Fatalf("Unmarshal: %v (check_attempt is a quoted JSON string)", err)
+	}
+	wantStr(t, "CheckAttempt", svc.CheckAttempt, "1")
+}
+
+// TestMonitoringService_Decode_CheckAttemptBlank pins why string is chosen over
+// json.Number: a string decodes a blank (or otherwise non-numeric) quoted value
+// without error, whereas json.Number rejects it and would abort the decode of
+// the whole service List page. Retyping CheckAttempt to json.Number makes this
+// Unmarshal fail.
+func TestMonitoringService_Decode_CheckAttemptBlank(t *testing.T) {
+	raw := `{"id":1,"description":"Ping","check_attempt":"","host":{"id":1,"name":"h"}}`
+	var svc MonitoringService
+	if err := json.Unmarshal([]byte(raw), &svc); err != nil {
+		t.Fatalf("Unmarshal of a blank check_attempt: %v (string must accept any quoted value)", err)
+	}
+	wantStr(t, "CheckAttempt", svc.CheckAttempt, "")
+}
+
+// TestMonitoringService_Decode_EnrichedFields covers the fields added for #68:
+// check_attempt (string), duration, criticality, and the nested host
+// display_name, with criticality populated in one service and null in another.
+func TestMonitoringService_Decode_EnrichedFields(t *testing.T) {
+	mux, c := newTestMux(t)
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/services", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"result": []map[string]any{
+				{
+					"id": 1, "description": "Ping",
+					"check_attempt":            "1",
+					"duration":                 "22h 49m",
+					"criticality":              10,
+					"host":                     map[string]any{"id": 1, "name": "web01", "display_name": "web01.local", "state": 0},
+					"scheduled_downtime_depth": 0,
+				},
+				{
+					"id": 2, "description": "CPU",
+					"check_attempt": "3",
+					"duration":      "5m",
+					"criticality":   nil,
+					"host":          map[string]any{"id": 1, "name": "web01", "state": 0},
+				},
+			},
+			"meta": map[string]any{"page": 1, "limit": 10, "total": 2},
+		})
+	})
+	resp, err := c.MonitoringServices.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(resp.Result) != 2 {
+		t.Fatalf("len(Result) = %d, want 2", len(resp.Result))
+	}
+	a := resp.Result[0]
+	if a.CheckAttempt != "1" {
+		t.Errorf("[0].CheckAttempt = %q, want %q", a.CheckAttempt, "1")
+	}
+	wantStr(t, "[0].Duration", a.Duration, "22h 49m")
+	wantStr(t, "[0].Host.DisplayName", a.Host.DisplayName, "web01.local")
+	wantIntPtr(t, "[0].Criticality", a.Criticality, 10)
+
+	b := resp.Result[1]
+	if b.CheckAttempt != "3" {
+		t.Errorf("[1].CheckAttempt = %q, want %q", b.CheckAttempt, "3")
+	}
+	// A JSON null criticality decodes to a nil pointer.
+	wantNilIntPtr(t, "[1].Criticality", b.Criticality)
+	// display_name absent on the nested host decodes to "".
+	wantStr(t, "[1].Host.DisplayName", b.Host.DisplayName, "")
+}
+
+// TestMonitoringService_Decode_CriticalityAbsent pins that an absent
+// criticality key (not just null) also decodes to a nil pointer.
+func TestMonitoringService_Decode_CriticalityAbsent(t *testing.T) {
+	raw := `{"id":1,"description":"Ping","host":{"id":1,"name":"h"}}`
+	var svc MonitoringService
+	if err := json.Unmarshal([]byte(raw), &svc); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	wantNilIntPtr(t, "Criticality", svc.Criticality)
+}

@@ -2,6 +2,7 @@ package centreon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"iter"
 )
@@ -35,10 +36,32 @@ type MonitoringResource struct {
 	Status               ResourceStatus            `json:"status"`
 	IsInDowntime         bool                      `json:"is_in_downtime"`
 	IsAcknowledged       bool                      `json:"is_acknowledged"`
+	IsInFlapping         bool                      `json:"is_in_flapping"`
 	Information          string                    `json:"information,omitzero"`
 	Tries                string                    `json:"tries,omitzero"`
-	LastStatusChange     string                    `json:"last_status_change,omitzero"`
-	NotificationEnabled  bool                      `json:"is_notification_enabled"`
+	Duration             string                    `json:"duration,omitzero"`
+	// LastCheck on /monitoring/resources is a humanized elapsed string (e.g.
+	// "1h 6m"), not an RFC3339 timestamp, matching this file's convention of
+	// modeling realtime timestamps as strings.
+	LastCheck               string  `json:"last_check,omitzero"`
+	LastStatusChange        string  `json:"last_status_change,omitzero"`
+	PerformanceData         *string `json:"performance_data"`
+	HasActiveChecksEnabled  bool    `json:"has_active_checks_enabled"`
+	HasPassiveChecksEnabled bool    `json:"has_passive_checks_enabled"`
+	NotificationEnabled     bool    `json:"is_notification_enabled"`
+
+	// Severity and Icon are nullable nested objects. On the validation box
+	// (Centreon 25.10.16) both are JSON null for every resource, so their
+	// populated object shape could not be live-verified. They are modeled as
+	// *json.RawMessage, not a typed struct, so the client asserts no unverified
+	// wire shape: a caller holding a populated instance decodes the raw bytes
+	// itself. A JSON null and an absent key both decode to a nil pointer; a
+	// present object decodes to a non-nil pointer to its raw bytes. The pointer
+	// (rather than a bare json.RawMessage) keeps MonitoringResource comparable.
+	// A typed model can replace this in a follow-up once a populated shape is
+	// captured live.
+	Severity *json.RawMessage `json:"severity"`
+	Icon     *json.RawMessage `json:"icon"`
 }
 
 // MonitoringResourceService provides access to the unified monitoring resources endpoint.
