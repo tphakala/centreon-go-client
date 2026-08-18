@@ -73,9 +73,7 @@ func (s *UserFilterService) Get(ctx context.Context, id int) (*UserFilter, error
 
 // Create creates a new user filter and returns its ID.
 func (s *UserFilterService) Create(ctx context.Context, req CreateUserFilterRequest) (int, error) {
-	if req.Criteria == nil {
-		req.Criteria = []FilterCriteria{}
-	}
+	req.Criteria = nilToEmpty(req.Criteria)
 	var result struct {
 		ID int `json:"id"`
 	}
@@ -87,9 +85,7 @@ func (s *UserFilterService) Create(ctx context.Context, req CreateUserFilterRequ
 
 // Update replaces an existing user filter using PUT.
 func (s *UserFilterService) Update(ctx context.Context, id int, req UpdateUserFilterRequest) error {
-	if req.Criteria == nil {
-		req.Criteria = []FilterCriteria{}
-	}
+	req.Criteria = nilToEmpty(req.Criteria)
 	return s.client.put(ctx, fmt.Sprintf("/users/filters/events-view/%d", id), req)
 }
 

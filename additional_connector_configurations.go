@@ -115,9 +115,7 @@ func (s *AdditionalConnectorConfigurationService) Get(ctx context.Context, id in
 // unmodified.
 func (s *AdditionalConnectorConfigurationService) Create(ctx context.Context, req *CreateAdditionalConnectorConfigurationRequest) (int, error) {
 	body := *req
-	if body.Pollers == nil {
-		body.Pollers = []int{}
-	}
+	body.Pollers = nilToEmpty(body.Pollers)
 	var result struct {
 		ID int `json:"id"`
 	}
@@ -133,9 +131,7 @@ func (s *AdditionalConnectorConfigurationService) Create(ctx context.Context, re
 // unmodified.
 func (s *AdditionalConnectorConfigurationService) Update(ctx context.Context, id int, req *UpdateAdditionalConnectorConfigurationRequest) error {
 	body := *req
-	if body.Pollers == nil {
-		body.Pollers = []int{}
-	}
+	body.Pollers = nilToEmpty(body.Pollers)
 	return s.client.put(ctx, fmt.Sprintf("/configuration/additional-connector-configurations/%d", id), &body)
 }
 
