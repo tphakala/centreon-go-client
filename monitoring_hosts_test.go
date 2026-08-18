@@ -275,3 +275,74 @@ func TestMonitoringHostService_Timeline(t *testing.T) {
 		t.Errorf("Result[1].Content = %q, want %q", resp.Result[1].Content, "Notification sent")
 	}
 }
+
+// TestMonitoringHost_Decode_NullPointers covers the fields added for #68 with
+// the nullable fields as JSON null: last_time_up, last_time_down,
+// last_time_unreachable, and criticality must decode to nil pointers, while the
+// non-null timing fields and the new bools decode into their value types. It
+// also re-confirms that check_attempt is a JSON number here (int), the host
+// side of the asymmetry.
+func TestMonitoringHost_Decode_NullPointers(t *testing.T) {
+	raw := `{
+		"id": 1, "name": "h", "display_name": "Host One",
+		"checked": true, "passive_checks": true,
+		"check_attempt": 1,
+		"last_hard_state_change": "2026-08-17T09:49:46+00:00",
+		"last_update": "2026-08-17T09:47:41+00:00",
+		"last_time_up": null,
+		"last_time_down": null,
+		"last_time_unreachable": null,
+		"criticality": null
+	}`
+	var h MonitoringHost
+	if err := json.Unmarshal([]byte(raw), &h); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	wantStr(t, "DisplayName", h.DisplayName, "Host One")
+	wantBool(t, "Checked", h.Checked, true)
+	wantBool(t, "PassiveChecks", h.PassiveChecks, true)
+	wantInt(t, "CheckAttempt", h.CheckAttempt, 1)
+	wantStr(t, "LastHardStateChange", h.LastHardStateChange, "2026-08-17T09:49:46+00:00")
+	wantStr(t, "LastUpdate", h.LastUpdate, "2026-08-17T09:47:41+00:00")
+	wantNilStrPtr(t, "LastTimeUp", h.LastTimeUp)
+	wantNilStrPtr(t, "LastTimeDown", h.LastTimeDown)
+	wantNilStrPtr(t, "LastTimeUnreachable", h.LastTimeUnreachable)
+	wantNilIntPtr(t, "Criticality", h.Criticality)
+}
+
+// TestMonitoringHost_Decode_PopulatedPointers pins the populated path for the
+// nullable pointer fields. It uses the field-by-field helpers, not
+// checkMonitoringHost, because that helper compares whole structs via
+// `*got != *want`, which would compare the pointer fields by identity and
+// false-fail on equal-but-distinct pointers.
+func TestMonitoringHost_Decode_PopulatedPointers(t *testing.T) {
+	raw := `{
+		"id": 1, "name": "h",
+		"last_time_up": "2026-08-18T10:00:00+00:00",
+		"last_time_down": "2026-08-18T07:31:46+00:00",
+		"last_time_unreachable": "2026-08-18T11:00:00+00:00",
+		"criticality": 5
+	}`
+	var h MonitoringHost
+	if err := json.Unmarshal([]byte(raw), &h); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	wantStrPtr(t, "LastTimeUp", h.LastTimeUp, "2026-08-18T10:00:00+00:00")
+	wantStrPtr(t, "LastTimeDown", h.LastTimeDown, "2026-08-18T07:31:46+00:00")
+	wantStrPtr(t, "LastTimeUnreachable", h.LastTimeUnreachable, "2026-08-18T11:00:00+00:00")
+	wantIntPtr(t, "Criticality", h.Criticality, 5)
+}
+
+// TestMonitoringHost_Decode_AbsentPointers pins that absent keys (not just
+// null) also decode to nil pointers.
+func TestMonitoringHost_Decode_AbsentPointers(t *testing.T) {
+	raw := `{"id": 1, "name": "h"}`
+	var h MonitoringHost
+	if err := json.Unmarshal([]byte(raw), &h); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	wantNilStrPtr(t, "LastTimeUp", h.LastTimeUp)
+	wantNilStrPtr(t, "LastTimeDown", h.LastTimeDown)
+	wantNilStrPtr(t, "LastTimeUnreachable", h.LastTimeUnreachable)
+	wantNilIntPtr(t, "Criticality", h.Criticality)
+}

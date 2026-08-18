@@ -1343,3 +1343,130 @@ func TestIntegration_AdditionalConnectorConfigurationLifecycle(t *testing.T) {
 		t.Errorf("after update port = %d, want 5701", updatedParams.Port)
 	}
 }
+
+// TestIntegration_TokenLifecycle creates, lists, and deletes an API token
+// against a live instance (issue #65). It never logs the secret.
+func TestIntegration_TokenLifecycle(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx := t.Context()
+
+	// Resolve a user id to own the token.
+	users, err := client.Users.List(ctx, WithLimit(1))
+	if err != nil {
+		t.Skipf("Users.List: %v (cannot resolve a user id for the token)", err)
+	}
+	if len(users.Result) == 0 {
+		t.Skip("no users available to own a token")
+	}
+	uid := users.Result[0].ID
+
+	name := fmt.Sprintf("centreon-go-client-it-%d", time.Now().UnixNano())
+	// Register cleanup before Create so the token is removed even if a later
+	// assertion fails. Uses context.Background() because t.Context() is already
+	// cancelled by the time cleanups run.
+	t.Cleanup(func() {
+		if err := client.Tokens.Delete(context.Background(), name); err != nil {
+			t.Logf("cleanup: Delete(%q): %v", name, err)
+		}
+	})
+
+	tok, err := client.Tokens.Create(ctx, &CreateTokenRequest{Name: name, Type: "api", UserID: uid})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	// Never log the secret; assert only that one was returned.
+	if len(tok.Value) == 0 {
+		t.Error("Create returned an empty token secret, want non-empty")
+	}
+	if tok.Name != name {
+		t.Errorf("Create Name = %q, want %q", tok.Name, name)
+	}
+	if tok.Type != "api" {
+		t.Errorf("Create Type = %q, want api", tok.Type)
+	}
+
+	// The token must appear in the list, without the secret.
+	var found *Token
+	for tk, err := range client.Tokens.All(ctx) {
+		if err != nil {
+			t.Fatalf("All: %v", err)
+		}
+		if tk.Name == name {
+			cp := *tk
+			found = &cp
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("token %q not found in list after Create", name)
+	}
+	if found.Value != "" {
+		t.Error("list token carries a non-empty Value, want empty (list omits the secret)")
+	}
+	if found.IsRevoked {
+		t.Error("new token IsRevoked = true, want false")
+	}
+	if found.User.ID != uid {
+		t.Errorf("token User.ID = %d, want %d", found.User.ID, uid)
+	}
+
+	// Delete and confirm it is gone.
+	if err := client.Tokens.Delete(ctx, name); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	for tk, err := range client.Tokens.All(ctx) {
+		if err != nil {
+			t.Fatalf("All after delete: %v", err)
+		}
+		if tk.Name == name {
+			t.Errorf("token %q still present after Delete", name)
+		}
+	}
+}
+
+// TestIntegration_MonitoringEnrichmentDecode proves the enriched monitoring
+// structs (issue #68) decode against the live wire, including the check_attempt
+// string/int asymmetry and the json.RawMessage severity/icon fields.
+func TestIntegration_MonitoringEnrichmentDecode(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx := t.Context()
+
+	// MonitoringResource List must decode, including the *json.RawMessage
+	// severity/icon fields and the added string/pointer enrichments. A non-empty
+	// result is required so the decode is actually exercised, not vacuously
+	// green on an empty instance.
+	res, err := client.Monitoring.List(ctx, WithLimit(5))
+	if err != nil {
+		t.Fatalf("Monitoring.List: %v", err)
+	}
+	if len(res.Result) == 0 {
+		t.Skip("no monitoring resources on this instance; enrichment decode not exercised")
+	}
+	t.Logf("decoded %d unified resources", len(res.Result))
+
+	// MonitoringService List must decode with check_attempt as a JSON string; a
+	// successful decode of a non-empty result is the live proof that the field is
+	// correctly typed string (an int field would fail on the quoted value).
+	svcs, err := client.MonitoringServices.List(ctx, WithLimit(5))
+	if err != nil {
+		t.Fatalf("MonitoringServices.List: %v", err)
+	}
+	if len(svcs.Result) == 0 {
+		t.Skip("no monitoring services on this instance; service enrichment decode not exercised")
+	}
+	for _, s := range svcs.Result {
+		t.Logf("service %d check_attempt=%q duration=%q", s.ID, s.CheckAttempt, s.Duration)
+		break
+	}
+
+	// MonitoringHost Get (host id 1 is the seeded host on the test box) must
+	// decode the enriched fields; skip if the host is absent.
+	host, err := client.MonitoringHosts.Get(ctx, 1)
+	if err != nil {
+		if ae, ok := errors.AsType[*APIError](err); ok && ae.HTTPStatus == http.StatusNotFound {
+			t.Skip("host id 1 not present; skipping host decode")
+		}
+		t.Fatalf("MonitoringHosts.Get(1): %v", err)
+	}
+	t.Logf("host %d check_attempt=%d display_name=%q", host.ID, host.CheckAttempt, host.DisplayName)
+}

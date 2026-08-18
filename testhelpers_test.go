@@ -12,10 +12,10 @@ import (
 	"testing"
 )
 
-// newTestClient creates an httptest.Server wired to handler, and a Client
-// pre-configured with WithAPIToken("test-token"). The server is closed when
-// the test finishes.
-func newTestClient(t *testing.T, handler http.Handler) (*Client, *httptest.Server) {
+// newTestClient creates an httptest.Server wired to handler and returns a Client
+// pre-configured with WithAPIToken("test-token"). The server is closed when the
+// test finishes.
+func newTestClient(t *testing.T, handler http.Handler) *Client {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
@@ -23,14 +23,14 @@ func newTestClient(t *testing.T, handler http.Handler) (*Client, *httptest.Serve
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	return c, srv
+	return c
 }
 
 // newTestMux creates a ServeMux and a Client wired to it.
 func newTestMux(t *testing.T) (*http.ServeMux, *Client) {
 	t.Helper()
 	mux := http.NewServeMux()
-	c, _ := newTestClient(t, mux)
+	c := newTestClient(t, mux)
 	return mux, c
 }
 
@@ -81,6 +81,24 @@ func wantNilIntPtr(t *testing.T, name string, got *int) {
 	t.Helper()
 	if got != nil {
 		t.Errorf("%s = %v, want nil", name, got)
+	}
+}
+
+func wantStrPtr(t *testing.T, name string, got *string, want string) {
+	t.Helper()
+	if got == nil {
+		t.Errorf("%s = nil, want %q", name, want)
+		return
+	}
+	if *got != want {
+		t.Errorf("%s = %q, want %q", name, *got, want)
+	}
+}
+
+func wantNilStrPtr(t *testing.T, name string, got *string) {
+	t.Helper()
+	if got != nil {
+		t.Errorf("%s = %q, want nil", name, *got)
 	}
 }
 

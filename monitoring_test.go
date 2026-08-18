@@ -383,3 +383,86 @@ func TestMonitoringList_ArrayFilterOnWire(t *testing.T) {
 		t.Errorf("types = %q, want %q", got, want)
 	}
 }
+
+// TestMonitoringResource_Decode_EnrichedFields covers the fields added for #68
+// on the unified resource: the flapping flag, duration, last_check, the check
+// toggles, and performance_data, plus severity/icon as *json.RawMessage
+// decoding a JSON null to a nil pointer.
+func TestMonitoringResource_Decode_EnrichedFields(t *testing.T) {
+	raw := `{
+		"id": 1, "name": "Centreon-Server", "type": "host",
+		"is_in_downtime": false, "is_acknowledged": false, "is_in_flapping": true,
+		"duration": "22h 49m", "last_check": "1h 6m",
+		"performance_data": "rta=0.2ms;;;0",
+		"has_active_checks_enabled": true, "has_passive_checks_enabled": false,
+		"is_notification_enabled": true,
+		"severity": null, "icon": null,
+		"status": {"code": 1, "name": "DOWN", "severity_code": 1}
+	}`
+	var r MonitoringResource
+	if err := json.Unmarshal([]byte(raw), &r); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	wantBool(t, "IsInFlapping", r.IsInFlapping, true)
+	wantStr(t, "Duration", r.Duration, "22h 49m")
+	wantStr(t, "LastCheck", r.LastCheck, "1h 6m")
+	wantStrPtr(t, "PerformanceData", r.PerformanceData, "rta=0.2ms;;;0")
+	wantBool(t, "HasActiveChecksEnabled", r.HasActiveChecksEnabled, true)
+	wantBool(t, "HasPassiveChecksEnabled", r.HasPassiveChecksEnabled, false)
+	// A JSON null nested object decodes into a nil pointer for a *json.RawMessage.
+	if r.Severity != nil {
+		t.Errorf("Severity = %s, want nil (null in JSON)", *r.Severity)
+	}
+	if r.Icon != nil {
+		t.Errorf("Icon = %s, want nil (null in JSON)", *r.Icon)
+	}
+}
+
+// TestMonitoringResource_Decode_NullAndAbsent pins that a null performance_data
+// and an absent one both decode to a nil pointer, that null/absent severity and
+// icon keys leave the *json.RawMessage nil, and that a present severity object
+// decodes to a non-nil pointer to its raw bytes.
+func TestMonitoringResource_Decode_NullAndAbsent(t *testing.T) {
+	nullPerf := `{"id": 1, "name": "h", "type": "host", "performance_data": null, "severity": null}`
+	var r1 MonitoringResource
+	if err := json.Unmarshal([]byte(nullPerf), &r1); err != nil {
+		t.Fatalf("Unmarshal null: %v", err)
+	}
+	wantNilStrPtr(t, "PerformanceData (null)", r1.PerformanceData)
+	if r1.Severity != nil {
+		t.Errorf("Severity = %s, want nil (null in JSON)", *r1.Severity)
+	}
+
+	absent := `{"id": 1, "name": "h", "type": "host"}`
+	var r2 MonitoringResource
+	if err := json.Unmarshal([]byte(absent), &r2); err != nil {
+		t.Fatalf("Unmarshal absent: %v", err)
+	}
+	wantNilStrPtr(t, "PerformanceData (absent)", r2.PerformanceData)
+	if r2.Severity != nil {
+		t.Errorf("Severity = %s, want nil (key absent)", *r2.Severity)
+	}
+	if r2.Icon != nil {
+		t.Errorf("Icon = %s, want nil (key absent)", *r2.Icon)
+	}
+
+	present := `{"id": 1, "name": "h", "type": "host", "severity": {"id": 3, "name": "warn", "level": 2}}`
+	var r3 MonitoringResource
+	if err := json.Unmarshal([]byte(present), &r3); err != nil {
+		t.Fatalf("Unmarshal present: %v", err)
+	}
+	if r3.Severity == nil {
+		t.Fatal("Severity = nil, want non-nil for a present object")
+	}
+	var sev struct {
+		ID    int    `json:"id"`
+		Name  string `json:"name"`
+		Level int    `json:"level"`
+	}
+	if err := json.Unmarshal(*r3.Severity, &sev); err != nil {
+		t.Fatalf("decode severity raw bytes: %v", err)
+	}
+	wantInt(t, "severity.id", sev.ID, 3)
+	wantStr(t, "severity.name", sev.Name, "warn")
+	wantInt(t, "severity.level", sev.Level, 2)
+}

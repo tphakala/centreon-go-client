@@ -9,23 +9,37 @@ import (
 
 // MonitoringHost represents a host as seen from the monitoring engine.
 type MonitoringHost struct {
-	ID               int     `json:"id"`
-	Name             string  `json:"name"`
-	AddressIP        string  `json:"address_ip,omitzero"`
-	Alias            string  `json:"alias,omitzero"`
-	State            int     `json:"state"`
-	StateType        int     `json:"state_type"`
-	Output           string  `json:"output,omitzero"`
-	Acknowledged     bool    `json:"acknowledged"`
-	PollerID         int     `json:"poller_id"`
-	CheckAttempt     int     `json:"check_attempt"`
-	MaxCheckAttempts int     `json:"max_check_attempts"`
-	LastCheck        string  `json:"last_check,omitzero"`
-	LastStateChange  string  `json:"last_state_change,omitzero"`
-	ExecutionTime    float64 `json:"execution_time"`
-	DowntimeDepth    int     `json:"scheduled_downtime_depth"`
-	IconImage        string  `json:"icon_image,omitzero"`
-	IconImageAlt     string  `json:"icon_image_alt,omitzero"`
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	DisplayName   string `json:"display_name,omitzero"`
+	AddressIP     string `json:"address_ip,omitzero"`
+	Alias         string `json:"alias,omitzero"`
+	State         int    `json:"state"`
+	StateType     int    `json:"state_type"`
+	Output        string `json:"output,omitzero"`
+	Acknowledged  bool   `json:"acknowledged"`
+	Checked       bool   `json:"checked"`
+	PassiveChecks bool   `json:"passive_checks"`
+	PollerID      int    `json:"poller_id"`
+	// CheckAttempt is a JSON number on /monitoring/hosts (verified: 1), so int
+	// is correct here. This is asymmetric with /monitoring/services, where the
+	// same logical field arrives as a quoted JSON string ("1") and is typed
+	// string on MonitoringService.CheckAttempt. The two endpoints genuinely
+	// differ; do not unify the types.
+	CheckAttempt        int     `json:"check_attempt"`
+	MaxCheckAttempts    int     `json:"max_check_attempts"`
+	LastCheck           string  `json:"last_check,omitzero"`
+	LastStateChange     string  `json:"last_state_change,omitzero"`
+	LastHardStateChange string  `json:"last_hard_state_change,omitzero"`
+	LastTimeUp          *string `json:"last_time_up"`
+	LastTimeDown        *string `json:"last_time_down"`
+	LastTimeUnreachable *string `json:"last_time_unreachable"`
+	LastUpdate          string  `json:"last_update,omitzero"`
+	ExecutionTime       float64 `json:"execution_time"`
+	DowntimeDepth       int     `json:"scheduled_downtime_depth"`
+	Criticality         *int    `json:"criticality"`
+	IconImage           string  `json:"icon_image,omitzero"`
+	IconImageAlt        string  `json:"icon_image_alt,omitzero"`
 }
 
 // StatusValue holds a count with a total subfield, as returned by the Centreon API.
