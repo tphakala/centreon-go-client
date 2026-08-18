@@ -117,9 +117,7 @@ func (s *AgentConfigurationService) Get(ctx context.Context, id int) (*AgentConf
 // copy so the caller's request struct is left unmodified.
 func (s *AgentConfigurationService) Create(ctx context.Context, req *CreateAgentConfigurationRequest) (int, error) {
 	body := *req
-	if body.PollerIDs == nil {
-		body.PollerIDs = []int{}
-	}
+	body.PollerIDs = nilToEmpty(body.PollerIDs)
 	var result struct {
 		ID int `json:"id"`
 	}
@@ -134,9 +132,7 @@ func (s *AgentConfigurationService) Create(ctx context.Context, req *CreateAgent
 // to a copy so the caller's request struct is left unmodified.
 func (s *AgentConfigurationService) Update(ctx context.Context, id int, req *UpdateAgentConfigurationRequest) error {
 	body := *req
-	if body.PollerIDs == nil {
-		body.PollerIDs = []int{}
-	}
+	body.PollerIDs = nilToEmpty(body.PollerIDs)
 	return s.client.put(ctx, fmt.Sprintf("/configuration/agent-configurations/%d", id), &body)
 }
 

@@ -77,12 +77,8 @@ func (s *TimePeriodService) Create(ctx context.Context, req *CreateTimePeriodReq
 	// Normalize nil slices to empty arrays on a copy so the caller's request
 	// struct is left unmodified (the API rejects null for these fields).
 	body := *req
-	if body.Days == nil {
-		body.Days = []TimePeriodDay{}
-	}
-	if body.Templates == nil {
-		body.Templates = []int{}
-	}
+	body.Days = nilToEmpty(body.Days)
+	body.Templates = nilToEmpty(body.Templates)
 	var result struct {
 		ID int `json:"id"`
 	}
@@ -100,15 +96,9 @@ func (s *TimePeriodService) Create(ctx context.Context, req *CreateTimePeriodReq
 // copy so the caller's request struct is left unmodified.
 func (s *TimePeriodService) Update(ctx context.Context, id int, req *UpdateTimePeriodRequest) error {
 	body := *req
-	if body.Days == nil {
-		body.Days = []TimePeriodDay{}
-	}
-	if body.Templates == nil {
-		body.Templates = []int{}
-	}
-	if body.Exceptions == nil {
-		body.Exceptions = []any{}
-	}
+	body.Days = nilToEmpty(body.Days)
+	body.Templates = nilToEmpty(body.Templates)
+	body.Exceptions = nilToEmpty(body.Exceptions)
 	return s.client.put(ctx, fmt.Sprintf("/configuration/timeperiods/%d", id), &body)
 }
 

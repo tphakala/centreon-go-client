@@ -417,11 +417,23 @@ func redactURLError(err error) error {
 // Logging helpers: no-ops when logger is nil.
 // Include tool name from context and request duration when available.
 
+// slog attribute keys for the logging helpers. Several of these keys recur
+// across the package and trip goconst; defining them all as constants clears
+// that finding and keeps the key set consistent.
+const (
+	logKeyMethod   = "method"
+	logKeyURL      = "url"
+	logKeyStatus   = "status"
+	logKeyError    = "error"
+	logKeyDuration = "duration"
+	logKeyTool     = "tool"
+)
+
 func (c *Client) logDebug(ctx context.Context, msg, method, reqURL string, status int, duration time.Duration) {
 	if c.logger != nil {
-		attrs := []any{"method", method, "url", redactURL(reqURL), "status", status, "duration", duration}
+		attrs := []any{logKeyMethod, method, logKeyURL, redactURL(reqURL), logKeyStatus, status, logKeyDuration, duration}
 		if tool := toolName(ctx); tool != "" {
-			attrs = append(attrs, "tool", tool)
+			attrs = append(attrs, logKeyTool, tool)
 		}
 		c.logger.Debug(msg, attrs...)
 	}
@@ -431,7 +443,7 @@ func (c *Client) logInfo(ctx context.Context, msg string) {
 	if c.logger != nil {
 		attrs := []any{}
 		if tool := toolName(ctx); tool != "" {
-			attrs = append(attrs, "tool", tool)
+			attrs = append(attrs, logKeyTool, tool)
 		}
 		c.logger.Info(msg, attrs...)
 	}
@@ -439,9 +451,9 @@ func (c *Client) logInfo(ctx context.Context, msg string) {
 
 func (c *Client) logError(ctx context.Context, msg, method, reqURL string, err error, duration time.Duration) {
 	if c.logger != nil {
-		attrs := []any{"method", method, "url", redactURL(reqURL), "error", err, "duration", duration}
+		attrs := []any{logKeyMethod, method, logKeyURL, redactURL(reqURL), logKeyError, err, logKeyDuration, duration}
 		if tool := toolName(ctx); tool != "" {
-			attrs = append(attrs, "tool", tool)
+			attrs = append(attrs, logKeyTool, tool)
 		}
 		c.logger.Error(msg, attrs...)
 	}
