@@ -401,8 +401,10 @@ func TestMonitoringServiceService_Metrics_NoMetrics(t *testing.T) {
 func TestMonitoringServiceService_Metrics_NotFoundError(t *testing.T) {
 	mux, c := newTestMux(t)
 
-	// A 404 that is not the "metrics not found" no-perfdata signal (for example a
-	// nonexistent host or service) must surface as an *APIError, not be masked.
+	// A 404 whose message is not "metrics not found" must surface as an *APIError.
+	// (On live 25.10.16 a nonexistent host or service actually returns "metrics
+	// not found" too and is mapped to empty; this synthetic different-message
+	// case pins the message gate for any other 404 shape the server might send.)
 	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/services/20/metrics", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"code": 404, "message": "Resource not found"})
 	})
@@ -440,5 +442,33 @@ func TestMonitoringServiceService_Metrics_NotFoundMessageOn500(t *testing.T) {
 	}
 	if metrics != nil {
 		t.Errorf("Metrics result = %v, want nil on error", metrics)
+	}
+}
+
+func TestMonitoringServiceService_Metrics_NotFoundMessageSuperstring(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	// The no-metrics mapping matches the message exactly. A 404 whose message
+	// merely contains "metrics not found" as a substring (here with trailing
+	// context) is a different response and must surface as an *APIError, not be
+	// mapped to an empty result. This pins the exact-message gate against a
+	// substring match.
+	mux.HandleFunc("GET /centreon/api/latest/monitoring/hosts/10/services/20/metrics", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"code": 404, "message": "metrics not found for service 20"})
+	})
+
+	metrics, err := c.MonitoringServices.Metrics(t.Context(), 10, 20)
+	if err == nil {
+		t.Fatal("Metrics: want error for a 404 whose message only contains 'metrics not found', got nil")
+	}
+	if metrics != nil {
+		t.Errorf("Metrics result = %v, want nil on error", metrics)
+	}
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok {
+		t.Fatalf("error is %T, want *APIError", err)
+	}
+	if apiErr.HTTPStatus != http.StatusNotFound {
+		t.Errorf("HTTPStatus = %d, want 404", apiErr.HTTPStatus)
 	}
 }
