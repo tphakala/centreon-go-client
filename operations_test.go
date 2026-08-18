@@ -266,3 +266,110 @@ func TestOperationsService_Comment(t *testing.T) {
 		t.Error("handler was not called")
 	}
 }
+
+// All five resource-posting endpoints reject a null resources with HTTP 500
+// ("[resources] NULL value found, but an array is required") and accept an empty
+// array as a no-op, so a nil Resources must marshal to [] rather than null.
+// Acknowledge/Downtime/Check/Submit normalize via nilToEmpty; Comment is already
+// safe because it builds the slice with make(), and its test guards that a future
+// refactor cannot reintroduce the null.
+
+func TestOperationsService_AcknowledgeNormalizesNilResources(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/acknowledge", func(w http.ResponseWriter, r *http.Request) {
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if got := string(raw["resources"]); got != "[]" {
+			t.Errorf("resources = %s, want [] (nil must normalize to an empty array, not null)", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := c.Operations.Acknowledge(t.Context(), &AcknowledgeRequest{Comment: "x"}); err != nil {
+		t.Fatalf("Acknowledge: %v", err)
+	}
+}
+
+func TestOperationsService_DowntimeNormalizesNilResources(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/downtime", func(w http.ResponseWriter, r *http.Request) {
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if got := string(raw["resources"]); got != "[]" {
+			t.Errorf("resources = %s, want [] (nil must normalize to an empty array, not null)", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := c.Operations.Downtime(t.Context(), &DowntimeRequest{Comment: "x"}); err != nil {
+		t.Fatalf("Downtime: %v", err)
+	}
+}
+
+func TestOperationsService_CheckNormalizesNilResources(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/check", func(w http.ResponseWriter, r *http.Request) {
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if got := string(raw["resources"]); got != "[]" {
+			t.Errorf("resources = %s, want [] (nil must normalize to an empty array, not null)", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := c.Operations.Check(t.Context(), &CheckRequest{}); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+}
+
+func TestOperationsService_SubmitNormalizesNilResources(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/submit", func(w http.ResponseWriter, r *http.Request) {
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if got := string(raw["resources"]); got != "[]" {
+			t.Errorf("resources = %s, want [] (nil must normalize to an empty array, not null)", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := &SubmitResultRequest{} // Resources is nil.
+	if err := c.Operations.Submit(t.Context(), req); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	// Submit normalizes on a copy, so the caller's request must be untouched.
+	if req.Resources != nil {
+		t.Errorf("Submit mutated caller's req.Resources = %v, want nil", req.Resources)
+	}
+}
+
+func TestOperationsService_CommentNormalizesNilResources(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("POST /centreon/api/latest/monitoring/resources/comments", func(w http.ResponseWriter, r *http.Request) {
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if got := string(raw["resources"]); got != "[]" {
+			t.Errorf("resources = %s, want [] (nil must normalize to an empty array, not null)", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := c.Operations.Comment(t.Context(), &CommentRequest{Comment: "x"}); err != nil {
+		t.Fatalf("Comment: %v", err)
+	}
+}

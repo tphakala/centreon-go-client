@@ -113,10 +113,14 @@ type OperationsService struct {
 	client *Client
 }
 
-// Acknowledge acknowledges one or more resources.
+// Acknowledge acknowledges one or more resources. A nil Resources is normalized
+// to an empty array: the endpoint rejects a null resources with HTTP 500
+// ("[resources] NULL value found, but an array is required") and accepts an
+// empty array as a no-op (HTTP 204). The wire body is a fresh struct, so req is
+// not mutated.
 func (s *OperationsService) Acknowledge(ctx context.Context, req *AcknowledgeRequest) error {
 	body := acknowledgeBody{
-		Resources: req.Resources,
+		Resources: nilToEmpty(req.Resources),
 		Acknowledgement: acknowledgeParam{
 			Comment:             req.Comment,
 			IsNotifyContacts:    req.IsNotifyContacts,
@@ -127,10 +131,12 @@ func (s *OperationsService) Acknowledge(ctx context.Context, req *AcknowledgeReq
 	return s.client.post(ctx, "/monitoring/resources/acknowledge", body, nil)
 }
 
-// Downtime schedules downtime for one or more resources.
+// Downtime schedules downtime for one or more resources. A nil Resources is
+// normalized to an empty array (the endpoint rejects a null resources with HTTP
+// 500; see Acknowledge).
 func (s *OperationsService) Downtime(ctx context.Context, req *DowntimeRequest) error {
 	body := downtimeBody{
-		Resources: req.Resources,
+		Resources: nilToEmpty(req.Resources),
 		Downtime: downtimeParam{
 			Comment:   req.Comment,
 			StartTime: req.StartTime,
@@ -142,18 +148,25 @@ func (s *OperationsService) Downtime(ctx context.Context, req *DowntimeRequest) 
 	return s.client.post(ctx, "/monitoring/resources/downtime", body, nil)
 }
 
-// Check forces an immediate check for one or more resources.
+// Check forces an immediate check for one or more resources. A nil Resources is
+// normalized to an empty array (the endpoint rejects a null resources with HTTP
+// 500; see Acknowledge).
 func (s *OperationsService) Check(ctx context.Context, req *CheckRequest) error {
 	body := checkBody{
-		Resources: req.Resources,
+		Resources: nilToEmpty(req.Resources),
 		Check:     checkParam{IsForced: true},
 	}
 	return s.client.post(ctx, "/monitoring/resources/check", body, nil)
 }
 
-// Submit submits passive check results for one or more resources.
+// Submit submits passive check results for one or more resources. A nil Resources
+// is normalized to an empty array (the endpoint rejects a null resources with
+// HTTP 500; see Acknowledge). Normalization is applied to a copy so the caller's
+// request struct is left unmodified.
 func (s *OperationsService) Submit(ctx context.Context, req *SubmitResultRequest) error {
-	return s.client.post(ctx, "/monitoring/resources/submit", req, nil)
+	body := *req
+	body.Resources = nilToEmpty(body.Resources)
+	return s.client.post(ctx, "/monitoring/resources/submit", &body, nil)
 }
 
 // Comment adds a comment to one or more resources.
