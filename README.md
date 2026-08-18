@@ -76,6 +76,8 @@ func main() {
 | Service Severities | yes | - | yes | PUT | yes |
 | Service Templates | yes | yes** / by ID* | yes | PATCH | yes |
 | Time Periods | yes | yes | yes | PUT | yes |
+| Agent Configurations***** | yes | yes | yes | PUT | yes |
+| Additional Connector Configurations***** | yes | yes | yes | PUT | yes |
 | Commands | yes | - | yes*** | - | - |
 | Monitoring Servers | yes | - | - | - | - |
 | Access Groups**** | yes | - | - | - | - |
@@ -89,6 +91,8 @@ func main() {
 *\*\*\* `Commands.Create` returns the full `*Command`, not just an ID, because Centreon Web 25.10 exposes no per-id route for commands (GET/PUT/PATCH/DELETE on `/configuration/commands/{id}` return 404). There is therefore no `Get`, `Update`, or `Delete`, and a created command cannot be removed via the client.*
 
 *\*\*\*\* Read-only lookups exposed by Centreon Web 25.10: `List` and `All` only, with no per-id, create, update, or delete route (POST returns HTTP 405). The Icons list is empty on a stock install because the media library is unpopulated.*
+
+*\*\*\*\*\* `Get(ctx, id)` returns the full configuration including a type-dependent nested object, exposed as a `json.RawMessage` for the caller to decode per `type`: `configuration` for agent configurations (`telegraf` vs `centreon-agent`) and `parameters` for additional connector configurations (`vmware_v6`). The list representation omits that object (and, for agent configurations, `connection_mode`; for connector configurations, `pollers`). `Create` and `Update` (PUT) take the nested object as a `json.RawMessage` too; on update, the `vmware_v6` `parameters.vcenters[]` entries must carry their server-assigned `id`. Requires Centreon 25.10+.*
 
 ### User & Contact Management
 
