@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	centreon "github.com/tphakala/centreon-go-client"
+	centreon "github.com/tphakala/centreon-go-client/v2"
 )
 
 func ExampleNewClient_sessionAuth() {
