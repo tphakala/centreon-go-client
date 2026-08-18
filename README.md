@@ -7,7 +7,7 @@ Zero external dependencies. Requires Go 1.26+.
 ## Install
 
 ```bash
-go get github.com/tphakala/centreon-go-client
+go get github.com/tphakala/centreon-go-client/v2
 ```
 
 ## Quick Start
@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"log"
 
-	centreon "github.com/tphakala/centreon-go-client"
+	centreon "github.com/tphakala/centreon-go-client/v2"
 )
 
 func main() {
