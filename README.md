@@ -97,6 +97,21 @@ func main() {
 
 *\*\*\*\*\*\* API tokens live under `/administration/tokens`, not `/configuration`. `Create` returns the full `*Token` including the one-time secret (`Value`), which the API returns only on create: store it securely and never log it (`Token` redacts `Value` from its `String`/`slog` output). There is no usable per-id lookup (the `GET /administration/tokens/{name}` route is registered but always returns 404 regardless of the identifier) and no `Update` route; `Delete` takes the token name because tokens have no numeric id.*
 
+### Platform & Version Gating
+
+`Platform.Versions(ctx)` returns the Centreon web core version plus module and widget versions (`GET /platform/versions`), and `Platform.InstallationStatus(ctx)` returns install and upgrade flags (`GET /platform/installation/status`). These are read-only platform metadata under `/platform`, not `/configuration`.
+
+The version's numeric parts are strings (for example `major` `"25"`, `minor` `"10"`), so comparing them lexically is wrong: `"9"` sorts after `"10"`, and a leading zero such as `"03"` compounds it. Use `PlatformVersions.AtLeast(major, minor)` to gate endpoints that exist only on a newer Centreon (for example the 25.10+ per-id `Get` routes), instead of inferring support from a 404:
+
+```go
+v, err := client.Platform.Versions(ctx)
+if err == nil && v.AtLeast(25, 10) {
+    // safe to call a 25.10-only endpoint such as Hosts.Get(ctx, id)
+}
+```
+
+`AtLeast` compares major then minor (the fix level is ignored) and returns false if the version does not parse, so an unknown version is treated as too old. Pairing this with `IsRouteNotFound` (see [Error Handling](#error-handling)) lets a consumer both gate ahead of time and recover from an absent endpoint at call time.
+
 ### User & Contact Management
 
 | Resource | List | Update | Notes |
@@ -324,6 +339,15 @@ if err != nil {
     // Check for not-found (from GetByID)
     if nfErr, ok := errors.AsType[*centreon.NotFoundError](err); ok {
         fmt.Printf("%s %d not found\n", nfErr.Resource, nfErr.ID)
+    }
+
+    // Distinguish an absent endpoint (routing 404) from a missing resource
+    // (resource 404, for example "Host not found"). Useful to degrade
+    // gracefully when an endpoint exists only on a newer Centreon. The client
+    // classifies the 404 internally, so a gateway consumer never has to parse
+    // the (remote-controlled) error message itself.
+    if centreon.IsRouteNotFound(err) {
+        fmt.Println("endpoint not available on this Centreon version")
     }
 }
 ```

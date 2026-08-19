@@ -1519,3 +1519,88 @@ func TestIntegration_MonitoringEnrichmentDecode(t *testing.T) {
 	}
 	t.Logf("host %d check_attempt=%d display_name=%q", host.ID, host.CheckAttempt, host.DisplayName)
 }
+
+// --- Platform metadata and 404 classification (#85, #91, #92) ---
+
+func TestIntegration_PlatformVersions(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	v, err := client.Platform.Versions(t.Context())
+	if err != nil {
+		t.Fatalf("Platform.Versions: %v", err)
+	}
+	if v.Web.Version == "" {
+		t.Error("Web.Version is empty")
+	}
+	t.Logf("web %s (major=%s minor=%s fix=%s), %d modules, %d widgets, AtLeast(25,10)=%v",
+		v.Web.Version, v.Web.Major, v.Web.Minor, v.Web.Fix, len(v.Modules), len(v.Widgets), v.AtLeast(25, 10))
+}
+
+func TestIntegration_PlatformInstallationStatus(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	st, err := client.Platform.InstallationStatus(t.Context())
+	if err != nil {
+		t.Fatalf("Platform.InstallationStatus: %v", err)
+	}
+	t.Logf("is_installed=%v has_upgrade_available=%v", st.IsInstalled, st.HasUpgradeAvailable)
+}
+
+func TestIntegration_RouteNotFound(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	// PATCH /configuration/users/{id} is not a registered route on 25.10.x, so
+	// it returns a routing 404 (body code 0, "No route found for ..."). This is
+	// the live stand-in for a 25.10-only endpoint hit on an older Centreon.
+	err := client.Users.Update(t.Context(), 1, UpdateUserRequest{})
+	if err == nil {
+		t.Fatal("expected a routing 404 from Users.Update, got nil")
+	}
+	if !IsRouteNotFound(err) {
+		t.Fatalf("IsRouteNotFound(err) = false, want true; err = %v", err)
+	}
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.HTTPStatus != http.StatusNotFound {
+		t.Errorf("HTTPStatus = %d, want 404", apiErr.HTTPStatus)
+	}
+}
+
+func TestIntegration_ResourceNotFound_NotRoute(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	// The per-id detail GET route exists only on Centreon 25.10+. Gate on the
+	// live platform version (dogfooding the new PlatformService): below 25.10 the
+	// route is absent, so the resource-404 case this test targets cannot be
+	// exercised. This makes the negative invariant below a hard assertion on
+	// 25.10+ rather than something a stray skip could mask.
+	v, err := client.Platform.Versions(t.Context())
+	if err != nil {
+		t.Fatalf("Platform.Versions: %v", err)
+	}
+	if !v.AtLeast(25, 10) {
+		t.Skipf("Centreon %s has no per-id host detail route (needs 25.10+)", v.Web.Version)
+	}
+
+	// On 25.10+ the route exists, so a missing host must surface as a resource
+	// 404 (body code 404, "Host not found"), which must NOT be classified as a
+	// routing 404. Together with TestIntegration_RouteNotFound this proves the
+	// two 404 shapes are distinguished on a live box.
+	_, err = client.Hosts.Get(t.Context(), 999999)
+	if err == nil {
+		t.Fatal("expected a 404 from Hosts.Get for a missing host, got nil")
+	}
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.HTTPStatus != http.StatusNotFound {
+		t.Errorf("HTTPStatus = %d, want 404", apiErr.HTTPStatus)
+	}
+	if IsRouteNotFound(err) {
+		t.Errorf("resource 404 misclassified as a routing 404: %v", apiErr.Message)
+	}
+	t.Logf("resource 404 correctly not classified as a routing 404: %v", apiErr.Message)
+}
