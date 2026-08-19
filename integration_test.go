@@ -1147,6 +1147,59 @@ func TestIntegration_TimePeriodUpdateExceptions(t *testing.T) {
 	}
 }
 
+func TestIntegration_TimePeriodExceptionRoundTrip(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	name := fmt.Sprintf("go-it-tp-exc-%d", time.Now().UnixNano())
+	id, err := client.TimePeriods.Create(t.Context(), &CreateTimePeriodRequest{
+		Name:  name,
+		Alias: "GO IT exception round-trip",
+		Days:  []TimePeriodDay{{Day: 1, TimeRange: "08:00-17:00"}},
+	})
+	if err != nil {
+		t.Fatalf("TimePeriods.Create: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.TimePeriods.Delete(context.Background(), id); err != nil {
+			t.Logf("cleanup: delete time period %d: %v", id, err)
+		}
+	})
+
+	// Update with a typed exception; the client sends only day_range/time_range
+	// (TimePeriodExceptionRequest has no id field).
+	if err := client.TimePeriods.Update(t.Context(), id, &UpdateTimePeriodRequest{
+		Name:  name,
+		Alias: "GO IT exception round-trip",
+		Days:  []TimePeriodDay{{Day: 1, TimeRange: "08:00-17:00"}},
+		Exceptions: []TimePeriodExceptionRequest{
+			{DayRange: "january 1", TimeRange: "00:00-00:00"},
+		},
+	}); err != nil {
+		t.Fatalf("TimePeriods.Update with exception: %v", err)
+	}
+
+	tp, err := client.TimePeriods.Get(t.Context(), id)
+	if err != nil {
+		t.Fatalf("TimePeriods.Get (after update): %v", err)
+	}
+	if len(tp.Exceptions) != 1 {
+		t.Fatalf("len(Exceptions) after update = %d, want 1", len(tp.Exceptions))
+	}
+	exc := tp.Exceptions[0]
+	if exc.DayRange != "january 1" {
+		t.Errorf("Exceptions[0].DayRange = %q, want %q", exc.DayRange, "january 1")
+	}
+	if exc.TimeRange != "00:00-00:00" {
+		t.Errorf("Exceptions[0].TimeRange = %q, want %q", exc.TimeRange, "00:00-00:00")
+	}
+	// The server assigns a read-only id on write; decoding a non-zero id back
+	// confirms the read side models it (TimePeriodException.ID).
+	if exc.ID == 0 {
+		t.Errorf("Exceptions[0].ID = 0, want a server-assigned non-zero id")
+	}
+	t.Logf("exception round-trip ok: id=%d day_range=%q time_range=%q", exc.ID, exc.DayRange, exc.TimeRange)
+}
+
 func TestIntegration_HostTemplateGet(t *testing.T) {
 	client := newIntegrationClient(t)
 

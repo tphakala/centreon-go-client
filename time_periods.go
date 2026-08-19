@@ -7,14 +7,19 @@ import (
 )
 
 // TimePeriod represents a Centreon time period configuration resource.
+//
+// Exceptions is []TimePeriodException, a breaking change from the []any used
+// through v2.0.0. Each read exception carries a server-assigned, read-only id.
+// To set exceptions on an update, use []TimePeriodExceptionRequest (which has no
+// id field), mirroring how Templates is read as []NamedRef but written as []int.
 type TimePeriod struct {
-	ID         int             `json:"id"`
-	Name       string          `json:"name"`
-	Alias      string          `json:"alias"`
-	Days       []TimePeriodDay `json:"days,omitzero"`
-	Templates  []NamedRef      `json:"templates,omitzero"`
-	Exceptions []any           `json:"exceptions,omitzero"`
-	InPeriod   bool            `json:"in_period"`
+	ID         int                   `json:"id"`
+	Name       string                `json:"name"`
+	Alias      string                `json:"alias"`
+	Days       []TimePeriodDay       `json:"days,omitzero"`
+	Templates  []NamedRef            `json:"templates,omitzero"`
+	Exceptions []TimePeriodException `json:"exceptions,omitzero"`
+	InPeriod   bool                  `json:"in_period"`
 }
 
 // TimePeriodDay represents a day definition within a time period.
@@ -22,6 +27,31 @@ type TimePeriod struct {
 // TimeRange is a string like "00:00-24:00".
 type TimePeriodDay struct {
 	Day       int    `json:"day"`
+	TimeRange string `json:"time_range"`
+}
+
+// TimePeriodException is a date-range exception within a time period, as
+// returned by reads (List and Get). On Centreon 25.10.x an exception round-trips
+// as {"id":2,"day_range":"january 1","time_range":"00:00-00:00"} (live-verified
+// on 25.10.16). DayRange is a human date expression (for example "january 1")
+// and TimeRange is a "HH:MM-HH:MM" window, paralleling TimePeriodDay.
+//
+// ID is server-assigned and read-only. To set exceptions on an update, build
+// []TimePeriodExceptionRequest instead; it has no id field, so the read-only id
+// cannot be sent by mistake.
+type TimePeriodException struct {
+	ID        int    `json:"id"`
+	DayRange  string `json:"day_range"`
+	TimeRange string `json:"time_range"`
+}
+
+// TimePeriodExceptionRequest is a single exception to send on a time-period
+// update. It deliberately omits the id field: the id is server-assigned and
+// read-only, and the live-verified write shape is {day_range, time_range}
+// (25.10.16). This read/write split mirrors a time period's templates, which are
+// read as []NamedRef but written as []int.
+type TimePeriodExceptionRequest struct {
+	DayRange  string `json:"day_range"`
 	TimeRange string `json:"time_range"`
 }
 
@@ -38,12 +68,16 @@ type CreateTimePeriodRequest struct {
 // On Centreon 25.10.x, PUT /configuration/timeperiods/{id} requires the
 // exceptions field, so Update always sends it (normalizing a nil slice to an
 // empty array); Create does not require it. See TimePeriodService.Update.
+//
+// Exceptions is []TimePeriodExceptionRequest, a breaking change from the []any
+// used through v2.0.0. Each entry carries only day_range and time_range; the
+// read-only, server-assigned id has no field here and so is never sent.
 type UpdateTimePeriodRequest struct {
-	Name       string          `json:"name"`
-	Alias      string          `json:"alias"`
-	Days       []TimePeriodDay `json:"days"`
-	Templates  []int           `json:"templates"`
-	Exceptions []any           `json:"exceptions"`
+	Name       string                       `json:"name"`
+	Alias      string                       `json:"alias"`
+	Days       []TimePeriodDay              `json:"days"`
+	Templates  []int                        `json:"templates"`
+	Exceptions []TimePeriodExceptionRequest `json:"exceptions"`
 }
 
 // TimePeriodService provides time period configuration operations.

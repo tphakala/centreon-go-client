@@ -75,7 +75,7 @@ func main() {
 | Service Categories | yes | yes | yes | PUT | yes |
 | Service Severities | yes | - | yes | PUT | yes |
 | Service Templates | yes | yes** / by ID* | yes | PATCH | yes |
-| Time Periods | yes | yes | yes | PUT | yes |
+| Time Periods******* | yes | yes | yes | PUT | yes |
 | Agent Configurations***** | yes | yes | yes | PUT | yes |
 | Additional Connector Configurations***** | yes | yes | yes | PUT | yes |
 | Commands | yes | - | yes*** | - | - |
@@ -96,6 +96,8 @@ func main() {
 *\*\*\*\*\* `Get(ctx, id)` returns the full configuration including a type-dependent nested object, exposed as a `json.RawMessage` for the caller to decode per `type`: `configuration` for agent configurations (`telegraf` vs `centreon-agent`) and `parameters` for additional connector configurations (`vmware_v6`). The list representation omits that object (and, for agent configurations, `connection_mode`; for connector configurations, `pollers`). `Create` and `Update` (PUT) take the nested object as a `json.RawMessage` too; on update, the `vmware_v6` `parameters.vcenters[]` entries must carry their server-assigned `id`. Requires Centreon 25.10+.*
 
 *\*\*\*\*\*\* API tokens live under `/administration/tokens`, not `/configuration`. `Create` returns the full `*Token` including the one-time secret (`Value`), which the API returns only on create: store it securely and never log it (`Token` redacts `Value` from its `String`/`slog` output). There is no usable per-id lookup (the `GET /administration/tokens/{name}` route is registered but always returns 404 regardless of the identifier) and no `Update` route; `Delete` takes the token name because tokens have no numeric id.*
+
+*\*\*\*\*\*\*\* Time period exceptions are typed, a breaking change from the `[]any` used through v2.0.0. Reads (`TimePeriod.Exceptions`) return `[]TimePeriodException`, each carrying a server-assigned, read-only `id` plus `day_range` and `time_range`. To set exceptions on an update, build `[]TimePeriodExceptionRequest` (`UpdateTimePeriodRequest.Exceptions`); it has no `id` field, so the read-only id is never sent by mistake. This read/write split mirrors a time period's templates, which are read as `[]NamedRef` but written as `[]int`. `Update` still sends `exceptions: []` when none are set, because Centreon 25.10.x requires the field.*
 
 ### Platform & Version Gating
 

@@ -98,6 +98,36 @@ func TestTimePeriodService_Get(t *testing.T) {
 	}
 }
 
+func TestTimePeriodService_Get_TypedExceptions(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	// The live 25.10.16 wire shape for an exception: a server-assigned id plus
+	// day_range and time_range. Pins that the typed TimePeriodException decodes
+	// all three, including the read-only id.
+	mux.HandleFunc("GET /centreon/api/latest/configuration/timeperiods/2", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id": 2, "name": "holidays", "alias": "Holidays",
+			"days":      []any{},
+			"templates": []any{},
+			"exceptions": []map[string]any{
+				{"id": 2, "day_range": "january 1", "time_range": "00:00-00:00"},
+			},
+			"in_period": false,
+		})
+	})
+
+	tp, err := c.TimePeriods.Get(t.Context(), 2)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if len(tp.Exceptions) != 1 {
+		t.Fatalf("len(Exceptions) = %d, want 1", len(tp.Exceptions))
+	}
+	wantInt(t, "Exceptions[0].ID", tp.Exceptions[0].ID, 2)
+	wantStr(t, "Exceptions[0].DayRange", tp.Exceptions[0].DayRange, "january 1")
+	wantStr(t, "Exceptions[0].TimeRange", tp.Exceptions[0].TimeRange, "00:00-00:00")
+}
+
 func TestTimePeriodService_Create(t *testing.T) {
 	mux, c := newTestMux(t)
 
@@ -193,6 +223,49 @@ func TestTimePeriodService_Update(t *testing.T) {
 	err := c.TimePeriods.Update(t.Context(), 5, &UpdateTimePeriodRequest{
 		Name:  "updated-hours",
 		Alias: "Updated Hours",
+	})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+}
+
+func TestTimePeriodService_Update_TypedExceptions(t *testing.T) {
+	mux, c := newTestMux(t)
+
+	mux.HandleFunc("PUT /centreon/api/latest/configuration/timeperiods/5", func(w http.ResponseWriter, r *http.Request) {
+		body := decodeBody(t, r)
+		exc, ok := body["exceptions"].([]any)
+		if !ok {
+			t.Fatalf("exceptions must be an array, got %T (%v)", body["exceptions"], body["exceptions"])
+		}
+		if len(exc) != 1 {
+			t.Fatalf("len(exceptions) = %d, want 1", len(exc))
+		}
+		e0, ok := exc[0].(map[string]any)
+		if !ok {
+			t.Fatalf("exceptions[0] must be an object, got %T", exc[0])
+		}
+		if e0["day_range"] != "january 1" {
+			t.Errorf("exceptions[0].day_range = %v, want %q", e0["day_range"], "january 1")
+		}
+		if e0["time_range"] != "00:00-00:00" {
+			t.Errorf("exceptions[0].time_range = %v, want %q", e0["time_range"], "00:00-00:00")
+		}
+		// The read-only id must never be sent on a write. TimePeriodExceptionRequest
+		// has no id field, so the key must be absent; this pins that against a
+		// future regression that adds one.
+		if _, present := e0["id"]; present {
+			t.Errorf("exceptions[0] must not contain an id key, got %v", e0)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := c.TimePeriods.Update(t.Context(), 5, &UpdateTimePeriodRequest{
+		Name:  "holidays",
+		Alias: "Holidays",
+		Exceptions: []TimePeriodExceptionRequest{
+			{DayRange: "january 1", TimeRange: "00:00-00:00"},
+		},
 	})
 	if err != nil {
 		t.Fatalf("Update: %v", err)
