@@ -77,6 +77,9 @@ type Client struct {
 
 	// Administration.
 	Tokens *TokenService
+
+	// Platform metadata (version and installation status).
+	Platform *PlatformService
 }
 
 // Option configures a Client.
@@ -135,6 +138,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.Icons = &IconService{client: c}
 	c.AccessGroups = &AccessGroupService{client: c}
 	c.Tokens = &TokenService{client: c}
+	c.Platform = &PlatformService{client: c}
 	return c, nil
 }
 
