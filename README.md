@@ -80,6 +80,7 @@ func main() {
 | Additional Connector Configurations***** | yes | yes | yes | PUT | yes |
 | Commands | yes | - | yes*** | - | - |
 | Monitoring Servers | yes | - | - | - | - |
+| Media Library‡ | yes | yes | yes | - | yes |
 | Access Groups**** | yes | - | - | - | - |
 | Connectors**** | yes | - | - | - | - |
 | Icons**** | yes | - | - | - | - |
@@ -97,6 +98,8 @@ func main() {
 *\*\*\*\*\* `Get(ctx, id)` returns the full configuration including a type-dependent nested object, exposed as a `json.RawMessage` for the caller to decode per `type`: `configuration` for agent configurations (`telegraf` vs `centreon-agent`) and `parameters` for additional connector configurations (`vmware_v6`). The list representation omits that object (and, for agent configurations, `connection_mode`; for connector configurations, `pollers`). `Create` and `Update` (PUT) take the nested object as a `json.RawMessage` too; on update, the `vmware_v6` `parameters.vcenters[]` entries must carry their server-assigned `id`. Requires Centreon 25.10+.*
 
 *\*\*\*\*\*\* API tokens live under `/administration/tokens`, not `/configuration`. `Create` returns the full `*Token` including the one-time secret (`Value`), which the API returns only on create: store it securely and never log it (`Token` redacts `Value` from its `String`/`slog` output). There is no usable per-id lookup (the `GET /administration/tokens/{name}` route is registered but always returns 404 regardless of the identifier) and no `Update` route; `Delete` takes the token name because tokens have no numeric id.*
+
+*‡ Media images live under `/configuration/medias`. `Create` uploads via multipart/form-data (the raw image bytes as a file part plus a required `directory`), not a JSON body; the client builds the multipart request for you. There is no JSON update modeled, and there is no content-download endpoint (`GET /configuration/medias/{id}/content` returns HTTP 405 on 25.10.16): the list `Media.URL` is the static path to fetch the raw image. Folders are listed via `ListFolders` (`/configuration/media/folders`) and are created implicitly when a media is uploaded into a new directory.*
 
 *\*\*\*\*\*\*\* Time period exceptions are typed, a breaking change from the `[]any` used through v2.0.0. Reads (`TimePeriod.Exceptions`) return `[]TimePeriodException`, each carrying a server-assigned, read-only `id` plus `day_range` and `time_range`. To set exceptions on an update, build `[]TimePeriodExceptionRequest` (`UpdateTimePeriodRequest.Exceptions`); it has no `id` field, so the read-only id is never sent by mistake. This read/write split mirrors a time period's templates, which are read as `[]NamedRef` but written as `[]int`. `Update` still sends `exceptions: []` when none are set, because Centreon 25.10.x requires the field.*
 
@@ -130,6 +133,8 @@ if err == nil && f.IsEnabled("notification") {
 
 `Proxy.Get(ctx)` returns the central outbound-proxy configuration (`GET /configuration/proxy`). The `password` is a credential returned in cleartext, so `ProxyConfiguration` redacts it from its `String`/`GoString`/`slog` output while `json.Marshal` still writes it. Only `Get` is exposed: the update path (PUT) is unusable on Centreon Web 25.10.16, where any body carrying the `protocol` key returns HTTP 500 for every value type while the GET response always includes `protocol`, so a read-modify-write cannot succeed. Update is deferred until the server defect is resolved.
 
+`Authentication` reads and updates the four authentication providers exposed as singletons under `/administration/authentication/providers`: `GetLocal`/`UpdateLocal` (the local password policy), `GetOpenID`/`UpdateOpenID` (OpenID Connect), `GetSAML`/`UpdateSAML` (SAML), and `GetWebSSO`/`UpdateWebSSO` (Web-SSO). Each update is a full-object replace (PUT), so the pattern is read, mutate, write back; the read struct doubles as the write body. `openid.client_secret` and `saml.certificate` are credentials returned in cleartext, so `OpenIDProvider` and `SAMLProvider` redact them from `String`/`GoString`/`slog` output while `json.Marshal` still writes them (the PUT needs them). OpenID also accepts PATCH for a partial update, but that subset is not modeled; `UpdateOpenID` uses the full-replace PUT. The OpenID and SAML `roles_mapping`/`groups_mapping` `relations` are kept as raw JSON pending a configured instance to pin their element shape.
+
 ### User & Contact Management
 
 | Resource | List | Update | Notes |
@@ -143,7 +148,7 @@ if err == nil && f.IsEnabled("notification") {
 
 *\*\* User filters send the plural `criterias` array on Create and Update (Centreon 25.10.x rejects the singular `criteria`), and `UserFilter` now also decodes the `order` field. `Update` (PUT) replaces a filter, including its name; `Patch` (PATCH) is a reorder-only route that sends `order` and cannot rename. The element shape of `FilterCriteria` is not yet verified against a populated filter.*
 
-`CurrentUser` provides read-only access to the authenticated user's own context: `GetParameters(ctx)` returns the profile and UI preferences (`GET /configuration/users/current/parameters`), `GetACLActions(ctx)` the allowed real-time actions per object type (`GET /users/acl/actions`), and `GetACLPermissions(ctx)` the effective feature permissions as a sparse `map[string]bool` (`GET /users/acl/permissions`). The parameters endpoint also accepts `PATCH` to update the current user's own preferences, but the writable field set is not yet modeled, so a partial-update method is deferred.
+`CurrentUser` provides access to the authenticated user's own context: `GetParameters(ctx)` returns the profile and UI preferences (`GET /configuration/users/current/parameters`), `GetACLActions(ctx)` the allowed real-time actions per object type (`GET /users/acl/actions`), and `GetACLPermissions(ctx)` the effective feature permissions as a sparse `map[string]bool` (`GET /users/acl/permissions`). `UpdateParameters(ctx, req)` partially updates the current user's own preferences (`PATCH /configuration/users/current/parameters`). The endpoint's schema is closed, so only `theme` and `user_interface_density` are writable (every other property is rejected on 25.10.16); `UpdateCurrentUserParametersRequest` models exactly those two as optional pointer fields, and only the ones set are sent.
 
 ### Monitoring (real-time)
 

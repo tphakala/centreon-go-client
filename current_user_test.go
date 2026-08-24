@@ -2,7 +2,9 @@ package centreon
 
 import (
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -125,6 +127,70 @@ func TestCurrentUserService_GetACLPermissions(t *testing.T) {
 	wantBool(t, `permissions["top_counter"]`, got["top_counter"], true)
 	wantBool(t, `permissions["configuration_host_group_write"]`, got["configuration_host_group_write"], false)
 	wantBool(t, `permissions["absent"]`, got["absent"], false)
+}
+
+func TestCurrentUserService_UpdateParameters(t *testing.T) {
+	mux, c := newTestMux(t)
+	var gotBody string
+	// The route is registered for PATCH only; calling any other verb 404s here,
+	// which pins that UpdateParameters uses PATCH.
+	mux.HandleFunc("PATCH /centreon/api/latest/configuration/users/current/parameters", func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	theme := "dark"
+	if err := c.CurrentUser.UpdateParameters(t.Context(), &UpdateCurrentUserParametersRequest{Theme: &theme}); err != nil {
+		t.Fatalf("UpdateParameters: %v", err)
+	}
+	// Only the set field is sent: theme present, user_interface_density omitted.
+	// Removing ,omitempty from UserInterfaceDensity would serialize a null and
+	// fail the absence assertion.
+	if !strings.Contains(gotBody, `"theme":"dark"`) {
+		t.Errorf("PATCH body = %s, want it to contain \"theme\":\"dark\"", gotBody)
+	}
+	if strings.Contains(gotBody, "user_interface_density") {
+		t.Errorf("PATCH body = %s, want it to omit the unset user_interface_density", gotBody)
+	}
+}
+
+func TestCurrentUserService_UpdateParameters_BothFields(t *testing.T) {
+	mux, c := newTestMux(t)
+	var gotBody string
+	mux.HandleFunc("PATCH /centreon/api/latest/configuration/users/current/parameters", func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	theme, density := "light", "detailed"
+	req := &UpdateCurrentUserParametersRequest{Theme: &theme, UserInterfaceDensity: &density}
+	if err := c.CurrentUser.UpdateParameters(t.Context(), req); err != nil {
+		t.Fatalf("UpdateParameters: %v", err)
+	}
+	if !strings.Contains(gotBody, `"theme":"light"`) {
+		t.Errorf("PATCH body = %s, want \"theme\":\"light\"", gotBody)
+	}
+	if !strings.Contains(gotBody, `"user_interface_density":"detailed"`) {
+		t.Errorf("PATCH body = %s, want \"user_interface_density\":\"detailed\"", gotBody)
+	}
+}
+
+func TestCurrentUserService_UpdateParameters_Error(t *testing.T) {
+	mux, c := newTestMux(t)
+	mux.HandleFunc("PATCH /centreon/api/latest/configuration/users/current/parameters", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"code": 500, "message": "boom"})
+	})
+
+	theme := "dark"
+	err := c.CurrentUser.UpdateParameters(t.Context(), &UpdateCurrentUserParametersRequest{Theme: &theme})
+	if err == nil {
+		t.Fatal("expected an error on HTTP 500, got nil")
+	}
+	if _, ok := errors.AsType[*APIError](err); !ok {
+		t.Errorf("expected *APIError, got %T", err)
+	}
 }
 
 func TestCurrentUserService_Errors(t *testing.T) {
