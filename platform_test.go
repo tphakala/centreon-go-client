@@ -124,6 +124,74 @@ func TestPlatformService_InstallationStatus_Error(t *testing.T) {
 	}
 }
 
+func TestPlatformService_Features(t *testing.T) {
+	mux, c := newTestMux(t)
+	// Mixed true/false flags so a swapped/dropped json tag or a struct-vs-map
+	// mistake is caught; is_cloud_platform:false is asymmetric to the true flags.
+	mux.HandleFunc("GET /centreon/api/latest/platform/features", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"is_cloud_platform": false,
+			"feature_flags": map[string]any{
+				"notification":               true,
+				"vault":                      false,
+				"resource_access_management": true,
+			},
+		})
+	})
+
+	got, err := c.Platform.Features(t.Context())
+	if err != nil {
+		t.Fatalf("Features: %v", err)
+	}
+	wantBool(t, "IsCloudPlatform", got.IsCloudPlatform, false)
+	wantInt(t, "len(FeatureFlags)", len(got.FeatureFlags), 3)
+	wantBool(t, `IsEnabled("notification")`, got.IsEnabled("notification"), true)
+	wantBool(t, `IsEnabled("vault")`, got.IsEnabled("vault"), false)
+	wantBool(t, `IsEnabled("resource_access_management")`, got.IsEnabled("resource_access_management"), true)
+	wantBool(t, `IsEnabled("absent")`, got.IsEnabled("absent"), false)
+}
+
+func TestPlatformFeatures_IsEnabled(t *testing.T) {
+	f := &PlatformFeatures{FeatureFlags: map[string]bool{"on": true, "off": false}}
+	tests := []struct {
+		name string
+		pf   *PlatformFeatures
+		flag string
+		want bool
+	}{
+		{"present true", f, "on", true},
+		{"present false", f, "off", false},
+		{"absent key", f, "missing", false},
+		{"nil receiver", nil, "on", false},
+		{"nil feature map", &PlatformFeatures{}, "on", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.pf.IsEnabled(tt.flag); got != tt.want {
+				t.Errorf("IsEnabled(%q) = %v, want %v", tt.flag, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlatformService_Features_Error(t *testing.T) {
+	mux, c := newTestMux(t)
+	mux.HandleFunc("GET /centreon/api/latest/platform/features", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"code": 500, "message": "boom"})
+	})
+
+	got, err := c.Platform.Features(t.Context())
+	if err == nil {
+		t.Fatal("expected an error on HTTP 500, got nil")
+	}
+	if got != nil {
+		t.Errorf("result = %v, want nil on error", got)
+	}
+	if _, ok := errors.AsType[*APIError](err); !ok {
+		t.Errorf("expected *APIError, got %T", err)
+	}
+}
+
 func TestPlatformVersions_AtLeast(t *testing.T) {
 	v := func(major, minor string) *PlatformVersions {
 		return &PlatformVersions{Web: ComponentVersion{Major: major, Minor: minor}}

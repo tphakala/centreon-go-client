@@ -83,6 +83,7 @@ func main() {
 | Access Groups**** | yes | - | - | - | - |
 | Connectors**** | yes | - | - | - | - |
 | Icons**** | yes | - | - | - | - |
+| Graph Templates**** | yes | - | - | - | - |
 | Tokens (administration)****** | yes | - | yes | - | yes |
 
 *\* by ID = filtered list lookup (API has no direct GET endpoint)*
@@ -114,6 +115,21 @@ if err == nil && v.AtLeast(25, 10) {
 
 `AtLeast` compares major then minor (the fix level is ignored) and returns false if the version does not parse, so an unknown version is treated as too old. Pairing this with `IsRouteNotFound` (see [Error Handling](#error-handling)) lets a consumer both gate ahead of time and recover from an absent endpoint at call time.
 
+`Platform.Features(ctx)` returns the platform feature flags (`GET /platform/features`): `IsCloudPlatform` plus a version-dependent `FeatureFlags map[string]bool`. Some v2 REST route families register only when their feature flag is enabled (for example `/configuration/notifications` under `notification`, resource-access rules under `resource_access_management`, and the vault endpoints under `vault`), so a consumer can call `Features` once and gate those calls with `PlatformFeatures.IsEnabled(flag)`, which returns false for an unknown or disabled flag:
+
+```go
+f, err := client.Platform.Features(ctx)
+if err == nil && f.IsEnabled("notification") {
+    // the /configuration/notifications routes are registered on this instance
+}
+```
+
+### Administration & Proxy
+
+`AdministrationParameters.Get(ctx)` returns the global monitoring default parameters (`GET /administration/parameters`): the default downtime and acknowledgement behaviour, refresh intervals, and the resource-status full-search flag. It is read-only on Centreon Web 25.10.x (a GET-only route; writes return HTTP 405).
+
+`Proxy.Get(ctx)` returns the central outbound-proxy configuration (`GET /configuration/proxy`). The `password` is a credential returned in cleartext, so `ProxyConfiguration` redacts it from its `String`/`GoString`/`slog` output while `json.Marshal` still writes it. Only `Get` is exposed: the update path (PUT) is unusable on Centreon Web 25.10.16, where any body carrying the `protocol` key returns HTTP 500 for every value type while the GET response always includes `protocol`, so a read-modify-write cannot succeed. Update is deferred until the server defect is resolved.
+
 ### User & Contact Management
 
 | Resource | List | Update | Notes |
@@ -126,6 +142,8 @@ if err == nil && v.AtLeast(25, 10) {
 *\* On Centreon Web 25.10.x, `UserService.Update` (`PATCH /configuration/users/{id}`) returns an `*APIError` with HTTP 404 (`No route found`): the route is unregistered, and PUT, POST, and DELETE for users and contacts are likewise absent, so users and contacts are effectively read-only through the v2 REST API on that version. The method is retained for other Centreon versions that register the route.*
 
 *\*\* User filters send the plural `criterias` array on Create and Update (Centreon 25.10.x rejects the singular `criteria`), and `UserFilter` now also decodes the `order` field. `Update` (PUT) replaces a filter, including its name; `Patch` (PATCH) is a reorder-only route that sends `order` and cannot rename. The element shape of `FilterCriteria` is not yet verified against a populated filter.*
+
+`CurrentUser` provides read-only access to the authenticated user's own context: `GetParameters(ctx)` returns the profile and UI preferences (`GET /configuration/users/current/parameters`), `GetACLActions(ctx)` the allowed real-time actions per object type (`GET /users/acl/actions`), and `GetACLPermissions(ctx)` the effective feature permissions as a sparse `map[string]bool` (`GET /users/acl/permissions`). The parameters endpoint also accepts `PATCH` to update the current user's own preferences, but the writable field set is not yet modeled, so a partial-update method is deferred.
 
 ### Monitoring (real-time)
 
