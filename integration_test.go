@@ -222,6 +222,42 @@ func TestIntegration_MonitoringServerLastRestart(t *testing.T) {
 	}
 }
 
+// TestIntegration_ListMonitoringServerStatus exercises the real-time
+// /monitoring/servers endpoint added for issue #86, distinct from the
+// configuration endpoint above: it reports live poller health (is_running,
+// last_alive Unix seconds, running version). The last_alive int64 decode is
+// pinned offline by TestMonitoringServerStatus_Decode; this test is an
+// opportunistic live smoke check that logs the live values and skips (rather
+// than fails) when no running poller reports a heartbeat, so it never flakes on
+// an environment without a live engine.
+func TestIntegration_ListMonitoringServerStatus(t *testing.T) {
+	client := newIntegrationClient(t)
+
+	resp, err := client.MonitoringServerStatus.List(t.Context())
+	if err != nil {
+		// Skip only on a genuine permission error; a decode or transport
+		// error must fail, since catching a live decode regression on
+		// last_alive is the point of this test.
+		if apiErr, ok := errors.AsType[*APIError](err); ok &&
+			(apiErr.HTTPStatus == http.StatusUnauthorized || apiErr.HTTPStatus == http.StatusForbidden) {
+			t.Skipf("MonitoringServerStatus.List: %v (token lacks permission)", err)
+		}
+		t.Fatalf("MonitoringServerStatus.List: %v", err)
+	}
+	t.Logf("Found %d monitoring server statuses (total: %d)", len(resp.Result), resp.Meta.Total)
+
+	var runningWithHeartbeat bool
+	for _, s := range resp.Result {
+		t.Logf("  %d: %s (running=%v, last_alive=%d, version=%s)", s.ID, s.Name, s.IsRunning, s.LastAlive, s.Version)
+		if s.IsRunning && s.LastAlive > 0 {
+			runningWithHeartbeat = true
+		}
+	}
+	if len(resp.Result) > 0 && !runningWithHeartbeat {
+		t.Skip("no running poller reported a non-zero last_alive; Unix-int wire value unverified live this run")
+	}
+}
+
 // --- User/contact endpoints (fixed in #28) ---
 
 func TestIntegration_ListUsers(t *testing.T) {
