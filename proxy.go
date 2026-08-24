@@ -89,14 +89,27 @@ func intPtrString(i *int) string {
 // ProxyService provides access to the central proxy configuration
 // (/configuration/proxy).
 //
-// Only Get is implemented. The v2 REST update path (PUT) is unusable on Centreon
-// Web 25.10.16: any PUT body carrying the "protocol" key returns HTTP 500
-// ("You must define a type for ...Proxy::$protocol") for every value type, and
-// the GET response always includes protocol, so a Get-modify-Update round-trip
-// cannot succeed. Update is therefore deferred until the server defect is fixed;
-// see issue #98.
+// The update verb is PUT (full replace), but with one server-side caveat on
+// Centreon Web 25.10.16: any PUT body carrying the "protocol" key returns HTTP
+// 500 ("You must define a type for ...Proxy::$protocol"), for every value, while
+// GET always returns protocol. Update works around this by sending only url,
+// port, user, and password and deliberately omitting protocol, so a
+// Get-modify-Update round-trip succeeds; protocol is not settable via v2 REST
+// and keeps its server default ("http://"). See issue #98.
 type ProxyService struct {
 	client *Client
+}
+
+// proxyUpdateBody is the PUT /configuration/proxy request body. It carries only
+// the four settable fields and, unlike ProxyConfiguration, has no "protocol" key:
+// sending protocol returns HTTP 500 on 25.10.16 (see ProxyService), so it is
+// omitted from the wire. Field types mirror ProxyConfiguration so a null clears a
+// field on the full-replace PUT.
+type proxyUpdateBody struct {
+	URL      *string `json:"url"`
+	Port     *int    `json:"port"`
+	User     *string `json:"user"`
+	Password *string `json:"password"`
 }
 
 // Get returns the central proxy configuration. The returned Password is in
@@ -108,4 +121,26 @@ func (s *ProxyService) Get(ctx context.Context) (*ProxyConfiguration, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+// Update replaces the central proxy configuration (PUT, full replace). It sends
+// url, port, user, and password from req; a nil field is sent as JSON null, which
+// the server treats as clearing that setting (live-verified against 25.10.16 by
+// TestIntegration_ProxyRoundTrip). req.Protocol is intentionally NOT sent: the
+// endpoint rejects any body containing protocol with HTTP 500 on 25.10.16.
+// Because an omitted key (unlike an explicit null) leaves protocol untouched, it
+// keeps its server default; this lets a Get-modify-Update round-trip of a
+// *ProxyConfiguration succeed even though Get always returns protocol.
+//
+// req.Password is sent in cleartext so the credential can be persisted;
+// ProxyConfiguration redacts it from String/slog output, so pass the struct
+// itself rather than formatting it into a log line.
+func (s *ProxyService) Update(ctx context.Context, req *ProxyConfiguration) error {
+	body := proxyUpdateBody{
+		URL:      req.URL,
+		Port:     req.Port,
+		User:     req.User,
+		Password: req.Password,
+	}
+	return s.client.put(ctx, "/configuration/proxy", body)
 }

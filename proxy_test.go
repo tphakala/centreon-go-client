@@ -121,6 +121,77 @@ func TestProxyConfiguration_RedactsSecret(t *testing.T) {
 	slog.New(slog.NewJSONHandler(&nbuf, nil)).Info("proxy", "cfg", nilCfg) // must not panic on nil Port/Password
 }
 
+// TestProxyService_Update pins the PUT body: it must carry only url/port/user/
+// password and MUST NOT carry "protocol". Sending protocol returns HTTP 500 on
+// 25.10.16 (server defect), and Update deliberately omits it so a
+// Get-modify-Update round-trip works. The password is written in cleartext (the
+// wire needs the real value; redaction lives only in String/slog).
+func TestProxyService_Update(t *testing.T) {
+	mux, c := newTestMux(t)
+	var gotBody map[string]any
+	mux.HandleFunc("PUT /centreon/api/latest/configuration/proxy", func(w http.ResponseWriter, r *http.Request) {
+		gotBody = decodeBody(t, r)
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	url, user, pw := "proxy.example.com", "puser", "s3cr3t-pw"
+	port := 3128
+	// Protocol is set on the input to prove Update strips it from the wire.
+	req := &ProxyConfiguration{URL: &url, Port: &port, User: &user, Password: &pw, Protocol: "http://"}
+	if err := c.Proxy.Update(t.Context(), req); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	// The emitted body must not include protocol (the poisoned key).
+	wantJSONKeys(t, "proxy update body", gotBody, "url", "port", "user", "password")
+	if _, ok := gotBody["protocol"]; ok {
+		t.Errorf("proxy update body carries protocol %v, want it omitted", gotBody["protocol"])
+	}
+	wantStr(t, "body.url", fmt.Sprintf("%v", gotBody["url"]), "proxy.example.com")
+	wantStr(t, "body.user", fmt.Sprintf("%v", gotBody["user"]), "puser")
+	// password must be the cleartext value, not redacted, on the wire.
+	wantStr(t, "body.password", fmt.Sprintf("%v", gotBody["password"]), "s3cr3t-pw")
+	if got, ok := gotBody["port"].(float64); !ok || int(got) != 3128 {
+		t.Errorf("body.port = %v, want 3128", gotBody["port"])
+	}
+}
+
+// TestProxyService_Update_ClearsFields pins that nil fields serialize as JSON null
+// (a full-replace PUT clears them), still without a protocol key.
+func TestProxyService_Update_ClearsFields(t *testing.T) {
+	mux, c := newTestMux(t)
+	var gotBody map[string]any
+	mux.HandleFunc("PUT /centreon/api/latest/configuration/proxy", func(w http.ResponseWriter, r *http.Request) {
+		gotBody = decodeBody(t, r)
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := c.Proxy.Update(t.Context(), &ProxyConfiguration{}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	wantJSONKeys(t, "proxy update body", gotBody, "url", "port", "user", "password")
+	for _, k := range []string{"url", "port", "user", "password"} {
+		if v, ok := gotBody[k]; !ok || v != nil {
+			t.Errorf("body.%s = %v (present=%v), want explicit null", k, v, ok)
+		}
+	}
+}
+
+func TestProxyService_Update_Error(t *testing.T) {
+	mux, c := newTestMux(t)
+	mux.HandleFunc("PUT /centreon/api/latest/configuration/proxy", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"code": 500, "message": "boom"})
+	})
+
+	err := c.Proxy.Update(t.Context(), &ProxyConfiguration{})
+	if err == nil {
+		t.Fatal("expected an error on HTTP 500, got nil")
+	}
+	if _, ok := errors.AsType[*APIError](err); !ok {
+		t.Errorf("expected *APIError, got %T", err)
+	}
+}
+
 func TestProxyService_Get_Error(t *testing.T) {
 	mux, c := newTestMux(t)
 	mux.HandleFunc("GET /centreon/api/latest/configuration/proxy", func(w http.ResponseWriter, _ *http.Request) {
