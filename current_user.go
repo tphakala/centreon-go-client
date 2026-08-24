@@ -60,8 +60,10 @@ type ACLActionSet struct {
 // current user rather than user configuration.
 //
 // The parameters endpoint also accepts PATCH to update the current user's own
-// preferences, but its writable field set is not yet modeled; a partial-update
-// method is deferred to a follow-up (see issue #106).
+// preferences; UpdateParameters exposes that. The writable subset is a closed
+// schema of exactly theme and user_interface_density (every other property is
+// rejected with HTTP 500 "additional properties" on Centreon Web 25.10.16), so
+// the request models only those two fields.
 type CurrentUserService struct {
 	client *Client
 }
@@ -96,4 +98,23 @@ func (s *CurrentUserService) GetACLPermissions(ctx context.Context) (map[string]
 		return nil, err
 	}
 	return result, nil
+}
+
+// UpdateCurrentUserParametersRequest is the partial-update body for
+// PATCH /configuration/users/current/parameters. Both fields are pointers with
+// omitempty so a nil field is omitted and only the preferences the caller sets
+// are sent. The endpoint's schema is closed (additionalProperties: false), so
+// these are the only two writable fields: Theme (for example "light" or "dark")
+// and UserInterfaceDensity (for example "compact" or "detailed"). Sending any
+// other property is rejected by the server.
+type UpdateCurrentUserParametersRequest struct {
+	Theme                *string `json:"theme,omitempty"`
+	UserInterfaceDensity *string `json:"user_interface_density,omitempty"`
+}
+
+// UpdateParameters partially updates the authenticated user's own preferences
+// via PATCH /configuration/users/current/parameters. Only the non-nil fields of
+// req are sent.
+func (s *CurrentUserService) UpdateParameters(ctx context.Context, req *UpdateCurrentUserParametersRequest) error {
+	return s.client.patch(ctx, "/configuration/users/current/parameters", req)
 }

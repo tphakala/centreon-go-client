@@ -83,12 +83,18 @@ type Client struct {
 	Tokens                   *TokenService
 	AdministrationParameters *AdministrationParametersService
 
+	// Authentication providers (local/openid/saml/web-sso singletons).
+	Authentication *AuthenticationProviderService
+
 	// Platform metadata (version and installation status).
 	Platform *PlatformService
 
 	// Configuration singletons and read-only lookups.
 	GraphTemplates *GraphTemplateService
 	Proxy          *ProxyService
+
+	// Medias is the media (image) library (/configuration/medias).
+	Medias *MediaService
 
 	// Current authenticated user context (profile, preferences, effective ACL).
 	CurrentUser *CurrentUserService
@@ -152,9 +158,11 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.AccessGroups = &AccessGroupService{client: c}
 	c.Tokens = &TokenService{client: c}
 	c.AdministrationParameters = &AdministrationParametersService{client: c}
+	c.Authentication = &AuthenticationProviderService{client: c}
 	c.Platform = &PlatformService{client: c}
 	c.GraphTemplates = &GraphTemplateService{client: c}
 	c.Proxy = &ProxyService{client: c}
+	c.Medias = &MediaService{client: c}
 	c.CurrentUser = &CurrentUserService{client: c}
 	return c, nil
 }
@@ -239,16 +247,37 @@ func (c *Client) buildURL(path string) string {
 	return fmt.Sprintf("%s/centreon/api/%s%s", c.baseURL, c.apiVersion, path)
 }
 
-// sendRequest builds and executes an HTTP request. It marshals body to JSON
-// if non-nil and sets the appropriate headers.
+// rawBody carries a pre-encoded request body and its Content-Type, so a caller
+// that needs a non-JSON body (for example a multipart/form-data upload) can
+// reuse the whole send/auth/401-retry path in do without sendRequest marshaling
+// it as JSON. The bytes are re-read from a fresh reader on every send, so a
+// 401-triggered retry replays the same body correctly. A nil *rawBody or a
+// rawBody with nil data sends no body.
+type rawBody struct {
+	contentType string
+	data        []byte
+}
+
+// sendRequest builds and executes an HTTP request. A *rawBody body is sent
+// verbatim with its own Content-Type; any other non-nil body is marshaled to
+// JSON. It sets the appropriate headers.
 func (c *Client) sendRequest(ctx context.Context, method, reqURL string, body any) (*http.Response, error) {
 	var bodyReader io.Reader
+	contentType := ""
 	if body != nil {
-		data, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("centreon: marshal request body: %w", err)
+		if rb, ok := body.(*rawBody); ok {
+			if rb != nil && rb.data != nil {
+				bodyReader = bytes.NewReader(rb.data)
+				contentType = rb.contentType
+			}
+		} else {
+			data, err := json.Marshal(body)
+			if err != nil {
+				return nil, fmt.Errorf("centreon: marshal request body: %w", err)
+			}
+			bodyReader = bytes.NewReader(data)
+			contentType = "application/json"
 		}
-		bodyReader = bytes.NewReader(data)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
@@ -260,8 +289,8 @@ func (c *Client) sendRequest(ctx context.Context, method, reqURL string, body an
 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "centreon-go-client")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 
 	c.mu.Lock()
