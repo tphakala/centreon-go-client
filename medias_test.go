@@ -72,7 +72,11 @@ func TestMediaService_Create(t *testing.T) {
 		if err := r.ParseMultipartForm(1 << 20); err != nil {
 			t.Errorf("ParseMultipartForm: %v", err)
 		}
-		gotDirectory = r.FormValue("directory")
+		// Read the directory from the already-parsed form rather than FormValue,
+		// which would trigger another (unbounded) parse.
+		if vs := r.MultipartForm.Value["directory"]; len(vs) > 0 {
+			gotDirectory = vs[0]
+		}
 		f, hdr, err := r.FormFile("data")
 		if err != nil {
 			t.Errorf("FormFile(data): %v", err)
