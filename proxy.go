@@ -51,6 +51,7 @@ func (p ProxyConfiguration) GoString() string {
 func (p ProxyConfiguration) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("url", derefStr(p.URL)),
+		slog.String("port", intPtrString(p.Port)),
 		slog.String("user", derefStr(p.User)),
 		slog.String("password", redactedSecret(derefStr(p.Password))),
 		slog.String("protocol", p.Protocol),

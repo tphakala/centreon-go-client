@@ -100,10 +100,25 @@ func TestProxyConfiguration_RedactsSecret(t *testing.T) {
 		t.Errorf("json.Marshal output = %s, want it to contain the password", data)
 	}
 
-	// A nil Password renders as <empty>, not <redacted>, and must not panic.
-	if s := (ProxyConfiguration{Protocol: "http://"}).String(); !strings.Contains(s, "<empty>") {
+	// Port must appear in BOTH String and slog output (parity: a non-default port
+	// must be identifiable in structured logs, not only in String).
+	if s := p.String(); !strings.Contains(s, "8080") {
+		t.Errorf("String() = %q, want it to contain the port 8080", s)
+	}
+	var pbuf bytes.Buffer
+	slog.New(slog.NewJSONHandler(&pbuf, nil)).Info("proxy", "cfg", p)
+	if out := pbuf.String(); !strings.Contains(out, "8080") {
+		t.Errorf("slog output = %s, want it to contain the port 8080", out)
+	}
+
+	// A nil Password renders as <empty>, not <redacted>, and a nil Port must be
+	// rendered nil-safe (no panic) on both the String and slog paths.
+	nilCfg := ProxyConfiguration{Protocol: "http://"}
+	if s := nilCfg.String(); !strings.Contains(s, "<empty>") {
 		t.Errorf("String() for nil Password = %q, want it to contain <empty>", s)
 	}
+	var nbuf bytes.Buffer
+	slog.New(slog.NewJSONHandler(&nbuf, nil)).Info("proxy", "cfg", nilCfg) // must not panic on nil Port/Password
 }
 
 func TestProxyService_Get_Error(t *testing.T) {
