@@ -42,30 +42,34 @@ type Client struct {
 	// because its other unexported fields are set only by NewClient.
 	loginSem chan struct{}
 
-	MonitoringServers    *MonitoringServerService
-	Commands             *CommandService
-	Hosts                *HostService
-	HostGroups           *HostGroupService
-	HostCategories       *HostCategoryService
-	HostSeverities       *HostSeverityService
-	HostTemplates        *HostTemplateService
-	Services             *ServiceService
-	ServiceGroups        *ServiceGroupService
-	ServiceCategories    *ServiceCategoryService
-	ServiceSeverities    *ServiceSeverityService
-	ServiceTemplates     *ServiceTemplateService
-	Monitoring           *MonitoringResourceService
-	MonitoringHosts      *MonitoringHostService
-	MonitoringServices   *MonitoringServiceService
-	Operations           *OperationsService
-	Users                *UserService
-	ContactGroups        *ContactGroupService
-	ContactTemplates     *ContactTemplateService
-	UserFilters          *UserFilterService
-	TimePeriods          *TimePeriodService
-	NotificationPolicies *NotificationPolicyService
-	Downtimes            *DowntimeService
-	Acknowledgements     *AcknowledgementService
+	MonitoringServers  *MonitoringServerService
+	Commands           *CommandService
+	Hosts              *HostService
+	HostGroups         *HostGroupService
+	HostCategories     *HostCategoryService
+	HostSeverities     *HostSeverityService
+	HostTemplates      *HostTemplateService
+	Services           *ServiceService
+	ServiceGroups      *ServiceGroupService
+	ServiceCategories  *ServiceCategoryService
+	ServiceSeverities  *ServiceSeverityService
+	ServiceTemplates   *ServiceTemplateService
+	Monitoring         *MonitoringResourceService
+	MonitoringHosts    *MonitoringHostService
+	MonitoringServices *MonitoringServiceService
+	// MonitoringServerStatus is the real-time poller-health endpoint
+	// (/monitoring/servers), distinct from the configuration-side
+	// MonitoringServers (/configuration/monitoring-servers).
+	MonitoringServerStatus *MonitoringServerStatusService
+	Operations             *OperationsService
+	Users                  *UserService
+	ContactGroups          *ContactGroupService
+	ContactTemplates       *ContactTemplateService
+	UserFilters            *UserFilterService
+	TimePeriods            *TimePeriodService
+	NotificationPolicies   *NotificationPolicyService
+	Downtimes              *DowntimeService
+	Acknowledgements       *AcknowledgementService
 
 	AgentConfigurations               *AgentConfigurationService
 	AdditionalConnectorConfigurations *AdditionalConnectorConfigurationService
@@ -123,6 +127,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.Monitoring = &MonitoringResourceService{client: c}
 	c.MonitoringHosts = &MonitoringHostService{client: c}
 	c.MonitoringServices = &MonitoringServiceService{client: c}
+	c.MonitoringServerStatus = &MonitoringServerStatusService{client: c}
 	c.Operations = &OperationsService{client: c}
 	c.Users = &UserService{client: c}
 	c.ContactGroups = &ContactGroupService{client: c}

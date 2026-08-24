@@ -134,6 +134,7 @@ if err == nil && v.AtLeast(25, 10) {
 | Unified Resources | List, GetHost, GetService† |
 | Monitoring Hosts | List, Get, StatusCounts, Services, Timeline |
 | Monitoring Services | List, StatusCounts, Timeline, Metrics‡ |
+| Monitoring Server Status | List§ |
 | Downtimes | List, Get, Cancel, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
 | Acknowledgements | List, Get, ListForHost, ListForService, CreateForHost, CreateForService, CancelForHost, CancelForService |
 | Notification Policies | GetForHost, GetForService |
@@ -143,6 +144,8 @@ if err == nil && v.AtLeast(25, 10) {
 *† `GetHost` populates `HostID`, and `GetService` populates `HostID` and `ServiceID`, from the call arguments, because the Centreon 25.10.x per-id detail endpoint omits them at the top level; that endpoint also does not report `is_notification_enabled`, so `NotificationEnabled` is populated only by `List` (and `All`).*
 
 *‡ `Metrics` returns an empty result rather than an error when a service has no performance data: Centreon 25.10.x answers that case with HTTP 404 `metrics not found`, which the client maps to an empty slice. Any other 404 (for example a nonexistent host or service) is surfaced as an `*APIError`.*
+
+*§ `Monitoring Server Status` is the real-time `/monitoring/servers` endpoint (`MonitoringServerStatus`), distinct from the configuration-side `Monitoring Servers` (`/configuration/monitoring-servers`) in the Configuration CRUD table above. It is list-only: `GET /monitoring/servers/{id}` returns HTTP 404 on Centreon 25.10.16, so there is no `Get`. `MonitoringServerStatus.LastAlive` is a Unix epoch `int64` (the poller's last heartbeat), in contrast to the config `MonitoringServer.LastRestart`, an RFC3339 `*time.Time`. The endpoint coerces a null heartbeat and running flag to `0` / `false` rather than emitting JSON null (verified live), so both are plain value fields. The sibling real-time `/monitoring/hostgroups` and `/monitoring/servicegroups` endpoints (also from issue #86) are deferred: their populated element shape could not be captured live and is tracked separately.*
 
 *The `MonitoringHost`, `MonitoringService`, and unified `MonitoringResource` structs decode additional real-time fields across these structs, with the exact set differing per endpoint (for example `duration` on services and resources, `last_update` and the per-check timers on hosts, `criticality` on hosts and services, and flapping and check-toggle flags on resources). `check_attempt` is asymmetric across endpoints: it is a JSON number on `/monitoring/hosts` (typed `int` on `MonitoringHost`) and a JSON string on `/monitoring/services` (typed `string` on `MonitoringService`). On unified resources, `severity` and `icon` are exposed as `*json.RawMessage` (nil for a null or absent value) because they are null on Centreon 25.10.16 and their populated shape is not yet verified against a live instance; `GetHost` and `GetService` do not populate these enrichment fields (they were verified only on the list endpoint).*
 
