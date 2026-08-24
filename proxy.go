@@ -2,6 +2,7 @@ package centreon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 )
@@ -136,6 +137,9 @@ func (s *ProxyService) Get(ctx context.Context) (*ProxyConfiguration, error) {
 // ProxyConfiguration redacts it from String/slog output, so pass the struct
 // itself rather than formatting it into a log line.
 func (s *ProxyService) Update(ctx context.Context, req *ProxyConfiguration) error {
+	if req == nil {
+		return errors.New("centreon: nil ProxyConfiguration")
+	}
 	body := proxyUpdateBody{
 		URL:      req.URL,
 		Port:     req.Port,

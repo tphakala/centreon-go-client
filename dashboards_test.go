@@ -537,6 +537,21 @@ func TestDashboard_InferredShapesDecode(t *testing.T) {
 	wantStr(t, "ContactGroups[0].Role", g.Role, "viewer")
 }
 
+// TestDashboardService_NilRequest pins that the write methods reject a nil
+// request with an error rather than panicking on a nil dereference.
+func TestDashboardService_NilRequest(t *testing.T) {
+	_, c := newTestMux(t)
+	if _, err := c.Dashboards.Create(t.Context(), nil); err == nil {
+		t.Error("Create(nil) = nil error, want a non-nil error")
+	}
+	if err := c.Dashboards.Update(t.Context(), 1, nil); err == nil {
+		t.Error("Update(nil) = nil error, want a non-nil error")
+	}
+	if err := c.Dashboards.UpdateShares(t.Context(), 1, nil); err == nil {
+		t.Error("UpdateShares(nil) = nil error, want a non-nil error")
+	}
+}
+
 // test-local helpers
 
 func ptr[T any](v T) *T { return &v }

@@ -177,6 +177,15 @@ func TestProxyService_Update_ClearsFields(t *testing.T) {
 	}
 }
 
+// TestProxyService_Update_Nil pins that a nil request returns an error rather
+// than panicking on a nil dereference.
+func TestProxyService_Update_Nil(t *testing.T) {
+	_, c := newTestMux(t)
+	if err := c.Proxy.Update(t.Context(), nil); err == nil {
+		t.Error("Update(nil) = nil error, want a non-nil error")
+	}
+}
+
 func TestProxyService_Update_Error(t *testing.T) {
 	mux, c := newTestMux(t)
 	mux.HandleFunc("PUT /centreon/api/latest/configuration/proxy", func(w http.ResponseWriter, _ *http.Request) {

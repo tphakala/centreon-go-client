@@ -3,6 +3,7 @@ package centreon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"time"
@@ -240,6 +241,9 @@ func normalizeCreatePanels(panels []DashboardPanelRequest) []DashboardPanelReque
 // slice to [], empty widget_settings to "{}") on a copy so the caller's request
 // struct is left unmodified.
 func (s *DashboardService) Create(ctx context.Context, req *CreateDashboardRequest) (int, error) {
+	if req == nil {
+		return 0, errors.New("centreon: nil CreateDashboardRequest")
+	}
 	body := *req
 	body.Panels = normalizeCreatePanels(req.Panels)
 	var result struct {
@@ -258,6 +262,9 @@ func (s *DashboardService) Create(ctx context.Context, req *CreateDashboardReque
 // becomes "{}". Panels is emitted as an array (empty, not null, when there are
 // none). The caller's request struct is not mutated.
 func (s *DashboardService) Update(ctx context.Context, id int, req *UpdateDashboardRequest) error {
+	if req == nil {
+		return errors.New("centreon: nil UpdateDashboardRequest")
+	}
 	body := dashboardUpdateBody{
 		Name:        req.Name,
 		Description: req.Description,
@@ -289,6 +296,9 @@ func (s *DashboardService) Delete(ctx context.Context, id int) error {
 // slices are normalized to empty arrays on a copy (so the caller's request struct
 // is left unmodified); passing an empty request clears all shares.
 func (s *DashboardService) UpdateShares(ctx context.Context, id int, req *UpdateDashboardSharesRequest) error {
+	if req == nil {
+		return errors.New("centreon: nil UpdateDashboardSharesRequest")
+	}
 	body := *req
 	body.Contacts = nilToEmpty(body.Contacts)
 	body.ContactGroups = nilToEmpty(body.ContactGroups)
