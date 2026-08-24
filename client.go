@@ -93,6 +93,10 @@ type Client struct {
 	GraphTemplates *GraphTemplateService
 	Proxy          *ProxyService
 
+	// Dashboards is the dashboard configuration library
+	// (/configuration/dashboards).
+	Dashboards *DashboardService
+
 	// Medias is the media (image) library (/configuration/medias).
 	Medias *MediaService
 
@@ -162,6 +166,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.Platform = &PlatformService{client: c}
 	c.GraphTemplates = &GraphTemplateService{client: c}
 	c.Proxy = &ProxyService{client: c}
+	c.Dashboards = &DashboardService{client: c}
 	c.Medias = &MediaService{client: c}
 	c.CurrentUser = &CurrentUserService{client: c}
 	return c, nil
