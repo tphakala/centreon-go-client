@@ -61,6 +61,30 @@ type InstallationStatus struct {
 	HasUpgradeAvailable bool `json:"has_upgrade_available"`
 }
 
+// PlatformFeatures is the response of GET /platform/features. IsCloudPlatform
+// reports whether this is a Centreon Cloud instance. FeatureFlags is keyed by
+// feature name (for example "notification", "vault", "resource_access_management")
+// with a bool for whether it is enabled. It is a map, not a fixed struct, because
+// the set of feature keys is version dependent and grows across Centreon releases;
+// a map decodes any key set without dropping unknown flags. Some v2 REST route
+// families register only when their flag is enabled, so a consumer can call
+// Features once and gate those calls with IsEnabled instead of probing for a 404.
+type PlatformFeatures struct {
+	IsCloudPlatform bool            `json:"is_cloud_platform"`
+	FeatureFlags    map[string]bool `json:"feature_flags"`
+}
+
+// IsEnabled reports whether the named feature flag is present and true. An absent
+// key returns false (the zero value of the map lookup), and a nil receiver returns
+// false, so a caller gating a feature treats "unknown" as disabled. This mirrors
+// PlatformVersions.AtLeast treating an unparseable version as too old.
+func (f *PlatformFeatures) IsEnabled(flag string) bool {
+	if f == nil {
+		return false
+	}
+	return f.FeatureFlags[flag]
+}
+
 // PlatformService provides read-only access to Centreon platform metadata
 // (GET /platform/versions and /platform/installation/status). A consumer can
 // call Versions once at connect to detect the Centreon version and gate
@@ -85,6 +109,18 @@ func (s *PlatformService) Versions(ctx context.Context) (*PlatformVersions, erro
 func (s *PlatformService) InstallationStatus(ctx context.Context) (*InstallationStatus, error) {
 	var result InstallationStatus
 	if err := s.client.get(ctx, "/platform/installation/status", &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Features returns the platform feature flags from GET /platform/features:
+// whether this is a Cloud instance and which optional features are enabled. Use
+// the result's IsEnabled to gate calls to feature-flagged endpoints (for example
+// /configuration/notifications, which registers only when "notification" is on).
+func (s *PlatformService) Features(ctx context.Context) (*PlatformFeatures, error) {
+	var result PlatformFeatures
+	if err := s.client.get(ctx, "/platform/features", &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

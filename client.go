@@ -80,10 +80,18 @@ type Client struct {
 	AccessGroups *AccessGroupService
 
 	// Administration.
-	Tokens *TokenService
+	Tokens                   *TokenService
+	AdministrationParameters *AdministrationParametersService
 
 	// Platform metadata (version and installation status).
 	Platform *PlatformService
+
+	// Configuration singletons and read-only lookups.
+	GraphTemplates *GraphTemplateService
+	Proxy          *ProxyService
+
+	// Current authenticated user context (profile, preferences, effective ACL).
+	CurrentUser *CurrentUserService
 }
 
 // Option configures a Client.
@@ -143,7 +151,11 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	c.Icons = &IconService{client: c}
 	c.AccessGroups = &AccessGroupService{client: c}
 	c.Tokens = &TokenService{client: c}
+	c.AdministrationParameters = &AdministrationParametersService{client: c}
 	c.Platform = &PlatformService{client: c}
+	c.GraphTemplates = &GraphTemplateService{client: c}
+	c.Proxy = &ProxyService{client: c}
+	c.CurrentUser = &CurrentUserService{client: c}
 	return c, nil
 }
 
