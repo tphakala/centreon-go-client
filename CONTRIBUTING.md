@@ -8,7 +8,7 @@ cd centreon-go-client
 git config core.hooksPath .githooks
 ```
 
-Requires Go 1.26+ and [golangci-lint](https://golangci-lint.run/) v2.11+.
+Requires Go 1.27+ and [golangci-lint](https://golangci-lint.run/) v2.14+.
 
 ## Making Changes
 
