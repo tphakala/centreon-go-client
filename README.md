@@ -2,7 +2,7 @@
 
 Go client library for the [Centreon Web REST API](https://docs-api.centreon.com/api/centreon-web/).
 
-Zero external dependencies. Requires Go 1.26+.
+Zero external dependencies. Requires Go 1.27+.
 
 ## Install
 

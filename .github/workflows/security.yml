@@ -21,8 +21,8 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'
-          # Fetch the newest 1.26.x rather than the runner's cached patch, so
+          go-version: '1.27'
+          # Fetch the newest 1.27.x rather than the runner's cached patch, so
           # govulncheck scans against the latest stdlib security fixes (#53).
           check-latest: true
 

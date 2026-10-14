@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ['1.26']
+        go-version: ['1.27']
     steps:
       - uses: actions/checkout@v7
 
@@ -31,7 +31,7 @@ jobs:
         run: go test -race -count=1 -coverprofile=coverage.out ./...
 
       - name: Upload coverage
-        if: matrix.go-version == '1.26'
+        if: matrix.go-version == '1.27'
         uses: actions/upload-artifact@v7
         with:
           name: coverage
@@ -45,13 +45,13 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'
+          go-version: '1.27'
           check-latest: true
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.11.4
+          version: v2.14.0
 
   vet:
     name: Vet
@@ -61,7 +61,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'
+          go-version: '1.27'
           check-latest: true
 
       - name: go vet
